@@ -1,0 +1,1104 @@
+; ********************************
+; * supermon+ 64 jim butterfield *
+; * v1.2   august 20 1985        *
+; ********************************
+tmp0 =$c1
+tmp2 =$c3
+satus =$90
+fnlen =$b7
+sadd =$b9
+fa =$ba
+fnadr =$bb
+ndx =$c6
+keyd =$0277
+bkvec =$0316
+*= $0100
+acmd *=*+1
+length *=*+1
+mnemw *=*+3
+savx *=*+1
+opcode *=*+1
+upflg *=*+1
+digcnt *=*+1
+indig  *=*+1
+numbit *=*+1
+stash *=*+2
+u0aa0 *=*+10
+u0aae =*
+stage *=*+30
+estage  =*
+*= $0200
+inbuff *=*+40
+endin =*
+pch *=*+1
+pcl *=*+1
+sr  *=*+1
+acc *=*+1
+xr  *=*+1
+yr  *=*+1
+sp  *=*+1
+store *=*+2
+chrpnt *=*+1
+savy *=*+1
+u9f *=*+1
+setmsg =$ff90
+second =$ff93
+tksa   =$ff96
+listen =$ffb1
+talk  =$ffb4
+setlfs =$ffba
+setnam =$ffbd
+acptr =$ffa5
+ciout =$ffa8
+untlk =$ffab
+unlsn =$ffae
+chkin =$ffc6
+clrchn =$ffcc
+input =$ffcf
+chrout =$ffd2
+load =$ffd5
+save =$ffd8
+stop =$ffe1
+getin =$ffe4
+*=$9519
+super ldy #msg4-msgbas:jsr sndmsg
+ lda supad:sta tmp0
+ lda supad+1:sta tmp0+1
+ jsr cvtdec
+ lda #0:ldx #6:ldy #3
+ jsr nmprnt:jsr crlf
+ lda linkad:sta bkvec
+ lda linkad+1:sta bkvec+1
+ lda #$80:jsr setmsg
+ brk
+;
+break ldx #$05
+bstack pla   ;y,x,a,sr,pcl,pch
+ sta pch,x
+ dex 
+ bpl bstack
+ cld
+ tsx 
+ stx sp
+ cli 
+; [r]
+dsplyr ldy #msg2-msgbas:jsr sndclr
+ lda #$3b:jsr chrout:lda #$20:jsr chrout
+ lda pch:jsr wrtwo
+ ldy #1
+disj lda pch,y
+ jsr wrbyte
+ iny 
+ cpy #7
+ bcc disj
+;
+strt jsr crlf
+ ldx #0
+ stx chrpnt
+smove jsr input
+ sta inbuff,x
+ inx 
+ cpx #endin-inbuff
+ bcs error
+ cmp #$0d
+ bne smove
+ lda #0
+ sta inbuff-1,x
+st1 jsr getchr
+ beq strt
+ cmp #$20
+ beq st1
+s0 ldx #keytop-keyw
+s1 cmp keyw,x:beq s2
+ dex:bpl s1
+; error
+error ldy #msg3-msgbas:jsr sndmsg
+ jmp strt
+s2 cpx #$13:bcs lsv
+ cpx #$0f:bcs cnvlnk
+ txa:asl a:tax
+ lda kaddr+1,x:pha
+ lda kaddr,x:pha
+ jmp getpar
+lsv sta savy
+ jmp ld
+cnvlnk jmp convrt
+; [x]
+exit jmp ($a002)
+; [m]
+dsplym bcs dspm11
+ jsr copy12
+ jsr getpar
+ bcc dsmnew
+dspm11 lda #$0b
+ sta tmp0
+ bne dspbyt
+dsmnew jsr sub12
+ bcc merror
+ ldx #3
+dspm01 lsr tmp0+1
+ ror tmp0
+ dex 
+ bne dspm01
+dspbyt jsr stop
+ beq dspmx
+ jsr dispmem
+ lda #8
+ jsr bumpad2
+ jsr suba1
+ bcs dspbyt
+dspmx jmp strt
+merror jmp error
+; [;]
+altr jsr copy1p
+ ldy #0
+altr1 jsr getpar
+ bcs altrx
+ lda tmp0
+ sta sr,y
+ iny 
+ cpy #$05
+ bcc altr1
+altrx jmp strt
+; [>]
+altm bcs altmx
+ jsr copy12
+ ldy #0
+altm1 jsr getpar
+ bcs altmx
+ lda tmp0
+ sta (tmp2),y
+ iny 
+ cpy #8
+ bcc altm1
+altmx lda #$91:jsr chrout
+ jsr dispmem
+ jmp strt
+; [g]
+goto ldx sp:txs
+goto2 jsr copy1p
+ sei:lda pch:pha
+ lda pcl:pha
+ lda sr:pha
+ lda acc:ldx xr:ldy yr:rti
+; [j]
+jsub ldx sp:txs:jsr goto2
+ sty yr:stx xr:sta acc
+ php:pla:sta sr
+ jmp dsplyr
+; display memory
+dispmem jsr crlf
+ lda #">"
+ jsr chrout
+ jsr showad
+ ldy #0
+ beq dmemgo
+dmemlp jsr space
+dmemgo lda (tmp2),y
+ jsr wrtwo
+ iny 
+ cpy #8
+ bcc dmemlp
+ ldy #msg5-msgbas:jsr sndmsg
+ ldy #0
+dchar lda (tmp2),y
+ tax:and #$bf:cmp #$22:beq ddot:txa
+ and #$7f
+ cmp #$20
+ txa
+ bcs dchrok
+ddot lda #$2e
+dchrok jsr chrout
+ iny 
+ cpy #8
+ bcc dchar
+ rts 
+; [c]
+compar lda #0
+ .byte $2c
+; [t]
+trans lda #$80
+ sta savy
+ lda #0
+ sta upflg
+ jsr getdif
+ bcs terror
+ jsr getpar
+ bcc tokay
+terror jmp error
+tokay bit savy
+ bpl compar1
+; compare adds1,adds3
+ lda tmp2
+ cmp tmp0
+ lda tmp2+1
+ sbc tmp0+1
+ bcs compar1
+; add adds2 to adds1
+ lda store
+ adc tmp0
+ sta tmp0
+ lda store+1
+ adc tmp0+1
+ sta tmp0+1
+ ldx #1
+tdown lda stash,x
+ sta tmp2,x
+ dex 
+ bpl tdown
+ lda #$80
+ sta upflg
+compar1 jsr crlf
+ ldy #0
+tcloop jsr stop
+ beq texit
+ lda (tmp2),y
+ bit savy
+ bpl compar2
+ sta (tmp0),y
+compar2 cmp (tmp0),y
+ beq tmvad
+ jsr showad
+tmvad bit upflg
+ bmi tdecad
+ inc tmp0
+ bne tincok
+ inc tmp0+1
+ bne tincok
+ jmp error
+tdecad jsr suba1
+ jsr sub21
+ jmp tmor
+tincok jsr adda2
+;
+tmor jsr sub13
+ bcs tcloop
+texit jmp strt
+; [h]
+hunt jsr getdif
+ bcs herror
+ ldy #0
+ jsr getchr
+ cmp #"'"
+ bne nostrh
+ jsr getchr
+ cmp #0
+ beq herror
+hpar sta stage,y
+ iny 
+ jsr getchr
+ beq htgo
+ cpy #estage-stage
+ bne hpar
+ beq htgo
+nostrh jsr rdpar
+hlp lda tmp0
+ sta stage,y
+ iny 
+ jsr getpar
+ bcs htgo
+ cpy #estage-stage
+ bne hlp
+htgo sty savy
+ jsr crlf
+hscan ldy #0
+hlp3 lda (tmp2),y
+ cmp stage,y
+ bne hnoft
+ iny 
+ cpy savy
+ bne hlp3
+; match found
+ jsr showad
+hnoft jsr stop
+ beq hexit
+ jsr adda2
+ jsr sub13
+ bcs hscan
+hexit jmp strt
+herror jmp error
+; [lsv]
+ld ldy #1:sty fa:sty sadd
+ dey:sty fnlen:sty satus
+ lda #>stage:sta fnadr+1
+ lda #<stage:sta fnadr
+l1 jsr getchr:beq lshort
+ cmp #$20:beq l1
+ cmp #$22:bne lerror
+ ldx chrpnt
+l3 lda inbuff,x:beq lshort
+ inx 
+ cmp #$22:beq l8
+ sta (fnadr),y
+ inc fnlen
+ iny 
+ cpy #estage-stage:bcc l3
+lerror jmp error
+l8 stx chrpnt
+ jsr getchr:beq lshort
+ jsr getpar:bcs lshort
+ lda tmp0:sta fa
+ jsr getpar:bcs lshort
+ jsr copy12
+ jsr getpar:bcs ldaddr
+ jsr crlf
+ ldx tmp0:ldy tmp0+1
+ lda savy:cmp #"s":bne lerror
+ lda #0:sta sadd
+ lda #tmp2
+ jsr save
+lsvxit jmp strt
+lshort lda savy
+ cmp #"v"
+ beq loadit
+ cmp #"l"
+ bne lerror
+ lda #0
+loadit jsr load
+ lda satus
+ and #$10
+ beq lsvxit
+ lda savy
+ beq lerror
+ ldy #msg6-msgbas:jsr sndmsg
+ jmp strt
+ldaddr ldx tmp2
+ ldy tmp2+1
+ lda #0
+ sta sadd
+ beq lshort
+; [f]
+fill jsr getdif:bcs aerror
+ jsr getpar:bcs aerror
+ jsr getchr:bne aerror
+ ldy #0
+fillp lda tmp0
+ sta (tmp2),y
+ jsr stop
+ beq fstart
+ jsr adda2
+ jsr sub13
+ bcs fillp
+fstart jmp strt
+; [a.]
+assem bcs aerror
+ jsr copy12
+aget1 ldx #0
+ stx u0aa0+1
+ stx digcnt
+aget2 jsr getchr
+ bne almor
+ cpx #0
+ beq fstart
+almor cmp #$20
+ beq aget1
+ sta mnemw,x
+ inx
+ cpx #3
+ bne aget2
+asqeez dex 
+ bmi aoprnd
+ lda mnemw,x
+ sec
+ sbc #$3f
+ ldy #$05
+ashift lsr a
+ ror u0aa0+1
+ ror u0aa0
+ dey
+ bne ashift:beq asqeez
+aerror jmp error
+; get the operand
+aoprnd ldx #2
+ascan lda digcnt:bne aform1
+; look for mode chars
+ jsr rdval:beq aform0:bcs aerror
+ lda #"$":sta u0aa0,x:inx
+ ldy #4
+ lda numbit:cmp #8:bcc aaddr
+ cpy digcnt:beq afill0
+aaddr lda tmp0+1:bne afill0
+ ldy #2               ;zero pge mode
+afill0 lda #$30
+afil0l sta u0aa0,x
+ inx:dey:bne afil0l
+; get format char
+aform0 dec chrpnt
+aform1 jsr getchr
+ beq aescan
+ cmp #$20:beq ascan
+ sta u0aa0,x
+ inx
+ cpx #u0aae-u0aa0
+ bcc ascan:bcs aerror
+;
+aescan stx store
+ ldx #0:stx opcode
+;
+atryop ldx #0:stx u9f
+ lda opcode
+ jsr instxx
+ ldx acmd
+ stx store+1
+ tax
+ lda mnemr,x:jsr chekop
+ lda mneml,x:jsr chekop
+ ldx #6
+tryit cpx #3:bne trymod
+ ldy length:beq trymod
+tryad lda acmd
+ cmp #$e8
+ lda #$30
+ bcs try4b
+ jsr chek2b
+ dey
+ bne tryad
+trymod asl acmd:bcc ub4df
+ lda char1-1,x:jsr chekop
+ lda char2-1,x:beq ub4df:jsr chekop
+ub4df dex:bne tryit:beq trybran
+;
+try4b jsr chek2b
+ jsr chek2b
+trybran lda store:cmp u9f:beq abran
+ jmp bumpop
+; check branch
+abran ldy length:beq a1byte
+ lda store+1:cmp #$9d:bne objput
+ lda tmp0:sbc tmp2:tax
+ lda tmp0+1:sbc tmp2+1:bcc abback
+ bne serror:cpx #$82:bcs serror
+ bcc abranx
+abback tay:iny:bne serror
+ cpx #$82:bcc serror
+abranx dex:dex:txa
+ ldy length:bne objp2
+objput lda tmp0-1,y
+objp2 sta (tmp2),y
+ dey
+ bne objput
+a1byte lda opcode
+ sta (tmp2),y
+ jsr crlf:lda #$91:jsr chrout
+ ldy #msg7-msgbas:jsr sndclr
+ jsr dislin
+ inc length
+ lda length:jsr bumpad2
+; stuff keyboard buffer
+ lda #"a":sta keyd
+ lda #" ":sta keyd+1:sta keyd+6
+ lda tmp2+1
+ jsr asctwo:sta keyd+2:stx keyd+3
+ lda tmp2
+ jsr asctwo:sta keyd+4:stx keyd+5
+ lda #7:sta ndx
+ jmp strt
+serror jmp error
+;
+chek2b jsr chekop
+;
+chekop stx savx
+ ldx u9f
+ cmp u0aa0,x
+ beq opok
+ pla
+ pla
+;
+bumpop inc opcode
+ beq serror
+ jmp atryop
+opok inc u9f
+ ldx savx
+ rts
+; [d]
+disass bcs dis0ad
+ jsr copy12
+ jsr getpar
+ bcc dis2ad
+dis0ad lda #$14
+ sta tmp0
+ bne disgo
+dis2ad jsr sub12
+ bcc derror
+disgo jsr cline
+ jsr stop
+ beq disexit
+ jsr dsout1
+ inc length
+ lda length
+ jsr bumpad2
+ lda length
+ jsr suba2
+ bcs disgo
+disexit jmp strt
+derror jmp error
+;
+dsout1 lda #"."
+ jsr chrout
+ jsr space
+;
+dislin jsr showad
+ jsr space
+ ldy #0
+ lda (tmp2),y
+ jsr instxx
+ pha
+ ldx length
+ inx
+dsbyt dex 
+ bpl dshex
+ sty savy:ldy #msg8-msgbas:jsr sndmsg:ldy savy
+ jmp nxbyt
+dshex lda (tmp2),y
+ jsr wrbyte
+;
+nxbyt iny 
+ cpy #3
+ bcc dsbyt
+ pla
+ ldx #3
+ jsr propxx
+ ldx #6
+pradr1 cpx #3
+ bne pradr3
+ ldy length
+ beq pradr3
+pradr2 lda acmd
+ cmp #$e8
+ php
+ lda (tmp2),y
+ plp
+ bcs relad
+ jsr wrtwo
+ dey
+ bne pradr2
+pradr3 asl acmd
+ bcc pradr4
+ lda char1-1,x
+ jsr chrout
+ lda char2-1,x
+ beq pradr4
+ jsr chrout
+pradr4 dex 
+ bne pradr1
+ rts
+relad jsr ub64d
+ clc
+ adc #1
+ bne relend
+ inx
+relend jmp wraddr
+;
+ub64d ldx tmp2+1
+ tay
+ bpl relc2
+ dex
+relc2 adc tmp2
+ bcc relc3
+ inx
+relc3 rts 
+; get opcode mode,len
+instxx tay 
+ lsr a:bcc ieven
+ lsr a:bcs err
+ cmp #$22:beq err  ;kill $89
+ and #$07:ora #$80
+ieven lsr a:tax
+ lda mode,x:bcs rtmode
+ lsr a:lsr a:lsr a:lsr a
+rtmode and #$0f:bne getfmt
+err ldy #$80:lda #0
+getfmt tax:lda mode2,x
+ sta acmd:and #$03:sta length
+ tya:and #$8f:tax
+ tya:ldy #3:cpx #$8a:beq gtfm4
+gtfm2 lsr a:bcc gtfm4
+ lsr a
+gtfm3 lsr a:ora #$20
+ dey:bne gtfm3
+ iny
+gtfm4 dey:bne gtfm2
+ rts
+;
+propxx tay 
+ lda mneml,y
+ sta store
+ lda mnemr,y
+ sta store+1
+prmn1 lda #0
+ ldy #$05
+prmn2 asl store+1
+ rol store
+ rol a
+ dey
+ bne prmn2
+ adc #$3f
+ jsr chrout
+ dex
+ bne prmn1
+ jmp space
+; read parameter
+rdpar dec chrpnt
+;
+getpar jsr rdval
+ bcs gterr
+ jsr gotchr
+ bne ckterm
+ dec chrpnt
+ lda digcnt
+ bne getgot
+ beq gtnil
+ckterm cmp #$20
+ beq getgot
+ cmp #","
+ beq getgot
+gterr pla 
+ pla
+ jmp error
+gtnil sec 
+ .byte $24
+getgot clc 
+ lda digcnt
+ rts
+; read value
+rdval lda #0
+ sta tmp0:sta tmp0+1
+ sta digcnt
+ txa:pha:tya:pha
+rdvmor jsr getchr:beq rdnilk
+ cmp #$20:beq rdvmor
+; check numeric mode
+ ldx #3
+gnmode cmp hikey,x
+ beq gotmod
+ dex:bpl gnmode
+ inx:dec chrpnt
+gotmod ldy modtab,x
+ lda lentab,x:sta numbit
+; get digit
+nudig jsr getchr
+rdnilk beq rdnil
+ sec:sbc #$30:bcc rdnil
+ cmp #$0a
+ bcc digmor
+ sbc #$07
+ cmp #$10
+ bcs rdnil
+digmor sta indig
+ cpy indig:bcc rderr:beq rderr
+ inc digcnt
+ cpy #10:bne nodecm
+ ldx #1
+declp1 lda tmp0,x
+ sta stash,x
+ dex
+ bpl declp1
+nodecm ldx numbit
+times2 asl tmp0:rol tmp0+1:bcs rderr
+ dex:bne times2
+ cpy #10:bne nodec2
+ asl stash:rol stash+1:bcs rderr
+ lda stash:adc tmp0:sta tmp0
+ lda stash+1:adc tmp0+1:sta tmp0+1
+ bcs rderr
+nodec2 clc 
+ lda indig:adc tmp0:sta tmp0
+ txa:adc tmp0+1:sta tmp0+1
+ bcc nudig
+rderr sec 
+ .byte $24
+rdnil clc 
+ sty numbit
+ pla:tay:pla:tax
+ lda digcnt
+ rts
+;
+showad lda tmp2
+ ldx tmp2+1
+; print address
+wraddr pha 
+ txa
+ jsr wrtwo
+ pla
+;
+wrbyte jsr wrtwo
+;
+space lda #$20
+ bne flip
+;
+chout cmp #$0d:bne flip
+crlf lda #$0d
+ bit $13:bpl flip
+ jsr chrout:lda #$0a
+flip jmp chrout
+;
+fresh jsr crlf
+ lda #$20:jsr chrout:jmp snclr
+;
+wrtwo stx savx
+ jsr asctwo
+ jsr chrout
+ txa
+ ldx savx
+ jmp chrout
+;
+asctwo pha 
+ jsr ascii
+ tax
+ pla
+ lsr a
+ lsr a
+ lsr a
+ lsr a
+;
+ascii and #$0f
+ cmp #$0a
+ bcc asc1
+ adc #6
+asc1 adc #$30
+ rts
+; get prev char
+gotchr dec chrpnt
+; get next char
+getchr stx savx
+ ldx chrpnt
+ lda inbuff,x
+ beq nochar
+ cmp #":"
+ beq nochar
+ cmp #"?"
+nochar php 
+ inc chrpnt
+ ldx savx
+ plp
+ rts
+; transfr addr1 to addr2
+copy12 lda tmp0
+ sta tmp2
+ lda tmp0+1
+ sta tmp2+1
+ rts
+; subtract addr2 from addr1
+sub12 sec 
+ lda tmp0
+ sbc tmp2
+ sta tmp0
+ lda tmp0+1
+ sbc tmp2+1
+ sta tmp0+1
+ rts
+;
+suba1 lda #1
+; subtract from addr1
+suba2 sta savx
+ sec
+ lda tmp0
+ sbc savx
+ sta tmp0
+ lda tmp0+1
+ sbc #0
+ sta tmp0+1
+ rts
+; subtract 1 from addr3
+sub13 sec 
+ lda store
+ sbc #1
+ sta store
+ lda store+1
+ sbc #0
+ sta store+1
+ rts
+; add to addr2
+adda2 lda #1
+;
+bumpad2 clc 
+ adc tmp2
+ sta tmp2
+ bcc bumpex
+ inc tmp2+1
+bumpex rts 
+; subtract 1 from addr2
+sub21 sec 
+ lda tmp2
+ sbc #1
+ sta tmp2
+ lda tmp2+1
+ sbc #0
+ sta tmp2+1
+ rts
+; copy addr1 to pc
+copy1p bcs cpy1px
+ lda tmp0
+ ldy tmp0+1
+ sta pcl
+ sty pch
+cpy1px rts 
+;
+getdif bcs gdifx
+ jsr copy12
+ jsr getpar
+ bcs gdifx
+ lda tmp0
+ sta stash
+ lda tmp0+1
+ sta stash+1
+ jsr sub12
+ lda tmp0
+ sta store
+ lda tmp0+1
+ sta store+1
+ bcc gdifx
+ clc
+ .byte $24
+gdifx sec 
+ rts
+; [$+&%]
+convrt jsr rdpar
+ jsr fresh
+ lda #"$"
+ jsr chrout
+ lda tmp0
+ ldx tmp0+1
+ jsr wraddr
+ jsr fresh
+ lda #"+"
+ jsr chrout
+ jsr cvtdec
+ lda #0
+ ldx #6
+ ldy #3
+ jsr nmprnt
+ jsr fresh
+ lda #"&"
+ jsr chrout
+ lda #0
+ ldx #8
+ ldy #2
+ jsr prinum
+ jsr fresh
+ lda #"%"
+ jsr chrout
+ lda #0
+ ldx #$18
+ ldy #0
+ jsr prinum
+ jmp strt
+;
+cvtdec jsr copy12
+ lda #0:ldx #2
+decml1 sta u0aa0,x
+ dex
+ bpl decml1
+; convert to decimal
+ ldy #16
+ php:sei:sed
+decml2 asl tmp2:rol tmp2+1
+ ldx #2
+decdbl lda u0aa0,x:adc u0aa0,x:sta u0aa0,x
+ dex:bpl decdbl
+ dey:bne decml2
+ plp
+ rts
+;
+prinum pha 
+ lda tmp0
+ sta u0aa0+2
+ lda tmp0+1
+ sta u0aa0+1
+lda #0
+ sta u0aa0
+ pla
+; print with zero suppr
+nmprnt sta digcnt
+ sty numbit
+digout ldy numbit
+ lda #0
+rolbit asl u0aa0+2
+ rol u0aa0+1
+ rol u0aa0
+ rol a
+ dey
+ bpl rolbit
+ tay
+ bne nzero
+ cpx #1
+ beq nzero
+ ldy digcnt
+ beq zersup
+nzero inc digcnt
+ ora #$30
+ jsr chrout
+zersup dex 
+ bne digout
+ rts
+; [@]
+dstat bne chgdev
+ ldx #8
+ .byte $2c
+chgdev ldx tmp0
+ cpx #4:bcc ioerr
+ cpx #32:bcs ioerr
+ stx tmp0
+ lda #0:sta satus:sta fnlen
+ jsr getchr:beq instat1
+ dec chrpnt
+ cmp #"$":beq direct
+ lda tmp0:jsr listen
+ lda #$6f:jsr second
+dcomd ldx chrpnt
+ inc chrpnt
+ lda inbuff,x:beq instat
+ jsr ciout
+ bcc dcomd
+instat jsr unlsn
+instat1 jsr crlf
+ lda tmp0:jsr talk
+ lda #$6f:jsr tksa
+rdstat jsr acptr
+ jsr chrout
+ cmp #$0d
+ beq dexit
+ lda satus
+ and #$bf
+ beq rdstat
+dexit jsr untlk
+ jmp strt
+ioerr jmp error
+direct lda tmp0:jsr listen
+ lda #$f0:jsr second
+ ldx chrpnt
+dir2 lda inbuff,x:beq dir3
+ jsr ciout:inx:bne dir2
+dir3 jsr unlsn
+ jsr crlf
+ lda tmp0:pha:jsr talk
+ lda #$60:jsr tksa
+ ldy #3
+dirlin sty store
+dlink jsr acptr:sta tmp0
+ lda satus:bne drexit
+ jsr acptr:sta tmp0+1
+ lda satus:bne drexit
+ dec store:bne dlink
+ jsr cvtdec
+ lda #0:ldx #6:ldy #3
+ jsr nmprnt
+ lda #" ":jsr chrout
+dname jsr acptr:beq dmore
+ ldx satus:bne drexit
+ jsr chrout:clc:bcc dname
+dmore jsr crlf
+ jsr stop:beq drexit
+ jsr getin:beq nopaws
+paws jsr getin:beq paws
+nopaws ldy #2:bne dirlin
+drexit jsr untlk
+ pla:jsr listen
+ lda #$e0:jsr second
+ jsr unlsn:jmp strt
+; print and clear routines
+cline jsr crlf:jmp snclr
+sndclr jsr sndmsg
+snclr ldy #$28
+snclp lda #$20:jsr chrout
+ lda #$14:jsr chrout
+ dey:bne snclp
+ rts
+sndmsg lda msgbas,y:php
+ and #$7f:jsr chout
+ iny:plp:bpl sndmsg
+ rts
+msgbas =*
+msg2 .byte $0d
+ .asc "   pc  sr ac xr yr sp   v1.2"
+ .byte $0d+$80
+msg3 .byte $1d,$3f+$80
+msg4 .asc "..sys"
+ .byte $20+$80
+msg5 .byte $3a,$12+$80
+msg6 .asc " erro"
+ .byte "r"+$80
+msg7 .byte $41,$20+$80
+msg8 .asc "  "
+ .byte $20+$80
+; mode table... nybble organized
+; 0=err  4=implied  8=zer,x  c=zer,y
+; 1=imm  5=acc      8=abs,x  d=rel
+; 2=zer  6=(ind,x)  a=abs,y
+; 3=abs  7=(ind),y  b=(ind)
+mode .byte $40,$02,$45,$03
+ .byte $d0,$08,$40,$09
+ .byte $30,$22,$45,$33
+ .byte $d0,$08,$40,$09
+ .byte $40,$02,$45,$33
+ .byte $d0,$08,$40,$09
+ .byte $40,$02,$45,$b3
+ .byte $d0,$08,$40,$09
+ .byte $00,$22,$44,$33
+ .byte $d0,$8c,$44,$00
+ .byte $11,$22,$44,$33
+ .byte $d0,$8c,$44,$9a
+ .byte $10,$22,$44,$33
+ .byte $d0,$08,$40,$09
+ .byte $10,$22,$44,$33
+ .byte $d0,$08,$40,$09
+ .byte $62,$13,$78,$a9
+;
+mode2 .byte $00,$21,$81,$82
+ .byte $00,$00,$59,$4d
+ .byte $91,$92,$86,$4a
+ .byte $85,$9d
+;
+char1 .byte $2c,$29,$2c
+ .byte $23,$28,$24
+;
+char2 .byte $59,$00,$58
+ .byte $24,$24,$00
+;
+mneml .byte $1c,$8a,$1c,$23
+ .byte $5d,$8b,$1b,$a1
+ .byte $9d,$8a,$1d,$23
+ .byte $9d,$8b,$1d,$a1
+ .byte $00,$29,$19,$ae
+ .byte $69,$a8,$19,$23
+ .byte $24,$53,$1b,$23
+ .byte $24,$53,$19,$a1
+ .byte $00,$1a,$5b,$5b
+ .byte $a5,$69,$24,$24
+ .byte $ae,$ae,$a8,$ad
+ .byte $29,$00,$7c,$00
+ .byte $15,$9c,$6d,$9c
+ .byte $a5,$69,$29,$53
+ .byte $84,$13,$34,$11
+ .byte $a5,$69,$23,$a0
+mnemr .byte $d8,$62,$5a,$48
+ .byte $26,$62,$94,$88
+ .byte $54,$44,$c8,$54
+ .byte $68,$44,$e8,$94
+ .byte $00,$b4,$08,$84
+ .byte $74,$b4,$28,$6e
+ .byte $74,$f4,$cc,$4a
+ .byte $72,$f2,$a4,$8a
+ .byte $00,$aa,$a2,$a2
+ .byte $74,$74,$74,$72
+ .byte $44,$68,$b2,$32
+ .byte $b2,$00,$22,$00
+ .byte $1a,$1a,$26,$26
+ .byte $72,$72,$88,$c8
+ .byte $c4,$ca,$26,$48
+ .byte $44,$44,$a2,$c8
+ .byte $0d,$20,$20,$20
+keyw .asc "acdfghjmrtx@.>;"
+hikey .asc "$+&%lsv"
+keytop =*
+; vectors
+kaddr .word assem-1,compar-1,disass-1,fill-1
+.word goto-1,hunt-1,jsub-1,dsplym-1
+.word dsplyr-1,trans-1,exit-1,dstat-1
+.word assem-1,altm-1,altr-1
+; modulo number systems
+modtab .byte $10,$0a,$08,02
+; bits per number system
+lentab .byte $04,$03,$03,$01
+linkad .word break
+supad .word super
