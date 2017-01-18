@@ -6,201 +6,235 @@
 ; * DEC 2016 BY J.B. LANGSTON    *
 ; ********************************
 
-TMP0    =$C1
-TMP2    =$C3
-SATUS   =$90
-FNLEN   =$B7
-SADD    =$B9
-FA      =$BA
-FNADR   =$BB
-NDX     =$C6
-KEYD    =$0277
-BKVEC   =$0316
+; zero-page temp variables
+; ------------------------
+TMP0    = $C1       ; misc, end address
+TMP2    = $C3       ; misc, start address
 
-        *= $0100
+; kernal variables
+; ----------------
+SATUS   = $90       ; kernal i/o status word
+FNLEN   = $B7       ; length of current filename
+SADD    = $B9       ; current secondary address
+FA      = $BA       ; current device number
+FNADR   = $BB       ; pointer to current filename
+NDX     = $C6       ; number of characters in keyboard buffer
+KEYD    = $0277     ; keyboard buffer
+BKVEC   = $0316     ; BRK vector
 
-ACMD    .fill 1
-LENGTH  .fill 1
-MNEMW   .fill 3
-SAVX    .fill 1
-OPCODE  .fill 1
-UPFLG   .fill 1
-DIGCNT  .fill 1
-INDIG   .fill 1
-NUMBIT  .fill 1
-STASH   .fill 2
-U0AA0   .fill 10
+        *= $0100    ; store variables in tape error buffer
+
+; 
+ACMD    .FILL 1
+LENGTH  .FILL 1
+MNEMW   .FILL 3
+SAVX    .FILL 1     ; place to save X register
+OPCODE  .FILL 1
+UPFLG   .FILL 1
+DIGCNT  .FILL 1
+INDIG   .FILL 1
+NUMBIT  .FILL 1 
+STASH   .FILL 2     ; place to stash values for later
+U0AA0   .FILL 10
 U0AAE   =*
-STAGE   .fill 30
+STAGE   .FILL 30
 ESTAGE  =*
 
-        *= $0200
+        *= $0200    ; store more variables in basic line editor buffer
 
-INBUFF  .fill 40
-ENDIN   =*
-PCH     .fill 1
-PCL     .fill 1
-SR      .fill 1
-ACC     .fill 1
-XR      .fill 1
-YR      .fill 1
-SP      .fill 1
-STORE   .fill 2
-CHRPNT  .fill 1
-SAVY    .fill 1
-U9F     .fill 1
+INBUFF  .FILL 40    ; 40-character input buffer
+ENDIN   =*          ; end of input buffer
+PCH     .FILL 1     ; program counter high byte
+PCL     .FILL 1     ; program counter low byte
+SR      .FILL 1     ; status register
+ACC     .FILL 1     ; accumulator
+XR      .FILL 1     ; X register
+YR      .FILL 1     ; Y register
+SP      .FILL 1     ; stack pointer
+STORE   .FILL 2     ; place to save address
+CHRPNT  .FILL 1     ; current position in input buffer
+SAVY    .FILL 1     ; place to save Y register
+U9F     .FILL 1
 
-SETMSG  =$FF90
-SECOND  =$FF93
-TKSA    =$FF96
-LISTEN  =$FFB1
-TALK    =$FFB4
-SETLFS  =$FFBA
-SETNAM  =$FFBD
-ACPTR   =$FFA5
-CIOUT   =$FFA8
-UNTLK   =$FFAB
-UNLSN   =$FFAE
-CHKIN   =$FFC6
-CLRCHN  =$FFCC
-INPUT   =$FFCF
-CHROUT  =$FFD2
-LOAD    =$FFD5
-SAVE    =$FFD8
-STOP    =$FFE1
-GETIN   =$FFE4
+; kernal entry points
+; -------------------
+SETMSG  = $FF90     ; set kernel message control flag
+SECOND  = $FF93     ; set secondary address after LISTEN
+TKSA    = $FF96     ; send secondary address after TALK
+LISTEN  = $FFB1     ; command serial bus device to LISTEN
+TALK    = $FFB4     ; command serial bus device to TALK
+SETLFS  = $FFBA     ; set logical file parameters
+SETNAM  = $FFBD     ; set filename
+ACPTR   = $FFA5     ; input byte from serial bus
+CIOUT   = $FFA8     ; output byte to serial bus
+UNTLK   = $FFAB     ; command serial bus device to UNTALK
+UNLSN   = $FFAE     ; command serial bus device to UNLISTEN
+CHKIN   = $FFC6     ; define input channel
+CLRCHN  = $FFCC     ; restore default devices
+INPUT   = $FFCF     ; input a character (CHRIN)
+CHROUT  = $FFD2     ; output a character
+LOAD    = $FFD5     ; load from device
+SAVE    = $FFD8     ; save to device
+STOP    = $FFE1     ; check the STOP key
+GETIN   = $FFE4     ; get a character
 
-        *=$9519
+; basic header
+; ------------
+.if 0
+*       = $0801
+        .word (+), 2005		; pointer, line number
+        .null $9e, ^SUPER	; will be sys 4096
++   .word 0					; basic line end
 
-SUPER   LDY #MSG4-MSGBAS
+*       = $1000
+.endif
+
+        *= $9519
+
+; initial entry point
+; -------------------
+SUPER   LDY #MSG4-MSGBAS    ; display "..SYS "
         JSR SNDMSG
-        LDA SUPAD
+        LDA SUPAD           ; store entry address in tmp0
         STA TMP0
         LDA SUPAD+1
         STA TMP0+1
-        JSR CVTDEC
+        JSR CVTDEC          ; convert to decimal
         LDA #0
         LDX #6
         LDY #3
-        JSR NMPRNT
+        JSR NMPRNT          ; print entry address
         JSR CRLF
-        LDA LINKAD
+        LDA LINKAD          ; set BRK vector
         STA BKVEC
         LDA LINKAD+1
         STA BKVEC+1
-        LDA #$80
-        JSR SETMSG
+        LDA #$80            ; disable kernel control messages
+        JSR SETMSG          ; and enable error messages
         BRK
 
-BREAK   LDX #$05
-BSTACK  PLA   ;Y,X,A,SR,PCL,PCH
-        STA PCH,X
+; BRK handler
+; -----------
+BREAK   LDX #$05            ; pull registers off the stack
+BSTACK  PLA                 ; order: Y,X,A,SR,PCL,PCH
+        STA PCH,X           ; store in variables
         DEX 
         BPL BSTACK
         CLD
         TSX 
-        STX SP
-        CLI 
+        STX SP              ; save the stack pointer
+        CLI                 ; enable interupts
 
-        ; [R]
-DSPLYR  LDY #MSG2-MSGBAS
+; display registers [R]
+; ---------------------
+DSPLYR  LDY #MSG2-MSGBAS    ; display headers
         JSR SNDCLR
-        LDA #$3B
+        LDA #$3B            ; prefix registers with "; "
         JSR CHROUT
         LDA #$20
         JSR CHROUT
-        LDA PCH
+        LDA PCH             ; print high byte of PC
         JSR WRTWO
         LDY #1
-DISJ    LDA PCH,Y
+DISJ    LDA PCH,Y           ; print rest of the registers
         JSR WRBYTE
         INY 
         CPY #7
         BCC DISJ
 
-STRT    JSR CRLF
-        LDX #0
-        STX CHRPNT
-SMOVE   JSR INPUT
-        STA INBUFF,X
+; get next command
+; ----------------
+STRT    JSR CRLF            ; new line
+        LDX #0              ; point at start of input buffer
+        STX CHRPNT 
+SMOVE   JSR INPUT           ; get character
+        STA INBUFF,X        ; store in input buffer
         INX 
-        CPX #ENDIN-INBUFF
+        CPX #ENDIN-INBUFF   ; error if buffer is full
         BCS ERROR
-        CMP #$0D
+        CMP #$0D            ; keep going until CR
         BNE SMOVE
         LDA #0
-        STA INBUFF-1,X
+        STA INBUFF-1,X      ; null-terminate input buffer
 ST1     JSR GETCHR
-        BEQ STRT
-        CMP #$20
+        BEQ STRT            ; start over if buffer is empty
+        CMP #$20            ; skip leading spaces
         BEQ ST1
-S0      LDX #KEYTOP-KEYW
-S1      CMP KEYW,X
-        BEQ S2
-        DEX
+S0      LDX #KEYTOP-KEYW    ; loop through valid command characters
+S1      CMP KEYW,X          ; see if character matches
+        BEQ S2              ; command matched, dispatch it
+        DEX                 ; no match, check next command
         BPL S1
 
-        ; ERROR
-ERROR   LDY #MSG3-MSGBAS
-        JSR SNDMSG
-        JMP STRT
-S2      CPX #$13
+; handle error
+; ------------
+ERROR   LDY #MSG3-MSGBAS    ; display "?" to indicate error
+        JSR SNDMSG          
+        JMP STRT            ; start over
+
+; dispatch command
+; ----------------
+S2      CPX #$13            ; last 3 commands in table are load/save/validate
         BCS LSV
-        CPX #$0F
+        CPX #$0F            ; next 4 commands are base conversions
         BCS CNVLNK
-        TXA
-        ASL A
-        TAX
-        LDA KADDR+1,X
+        TXA                 ; remaining commands dispatch through vector table
+        ASL A               ; multiply index of command by 2 since table
+        TAX                 ; contains 2-byte addresses
+        LDA KADDR+1,X       ; push address from vector table onto stack
         PHA
         LDA KADDR,X
         PHA
-        JMP GETPAR
-LSV     STA SAVY
+        JMP GETPAR          ; get parameters for command
+LSV     STA SAVY            ; handle load/save/validate
         JMP LD
-CNVLNK  JMP CONVRT
+CNVLNK  JMP CONVRT          ; handle base conversion
 
-        ; [X]
-EXIT    JMP ($A002)
+; exit monitor [X]
+; ----------------
+EXIT    JMP ($A002)         ; jump to warm-start vector to reinitialize BASIC
 
-        ; [M]
-DSPLYM  BCS DSPM11
-        JSR COPY12
-        JSR GETPAR
+; display memory [M]
+; ------------------
+DSPLYM  BCS DSPM11          ; no parameter specified
+        JSR COPY12          ; save start address
+        JSR GETPAR          ; get end address
         BCC DSMNEW
-DSPM11  LDA #$0B
+DSPM11  LDA #$0B            ; show 12 lines by default
         STA TMP0
         BNE DSPBYT
-DSMNEW  JSR SUB12
-        BCC MERROR
-        LDX #3
+DSMNEW  JSR SUB12           ; get number of bytes between address
+        BCC MERROR          ; error if start is after end
+        LDX #3              ; divide by 8 (shift right 3 times)
 DSPM01  LSR TMP0+1
         ROR TMP0
         DEX 
         BNE DSPM01
-DSPBYT  JSR STOP
-        BEQ DSPMX
-        JSR DISPMEM
-        LDA #8
+DSPBYT  JSR STOP            ; check for stop key
+        BEQ DSPMX           ; exit early if pressed
+        JSR DISPMEM         ; display 1 line
+        LDA #8              ; increase start address by 8 bytes
         JSR BUMPAD2
-        JSR SUBA1
-        BCS DSPBYT
-DSPMX   JMP STRT
+        JSR SUBA1           ; decrement line counter
+        BCS DSPBYT          ; show another line until it's < 0
+DSPMX   JMP STRT            ; start over
 MERROR  JMP ERROR
 
-        ; [;]
-ALTR    JSR COPY1P
-        LDY #0
-ALTR1   JSR GETPAR
-        BCS ALTRX
-        LDA TMP0
-        STA SR,Y
-        INY 
-        CPY #$05
-        BCC ALTR1
-ALTRX   JMP STRT
+; alter registers [;]
+; -------------------
+ALTR    JSR COPY1P          ; store first parameter in PC
+        LDY #0              ; init counter
+ALTR1   JSR GETPAR          ; get value for next paremeter
+        BCS ALTRX           ; exit if no more values
+        LDA TMP0            ; get parameter
+        STA SR,Y            ; store in variable, offset from SR
+        INY
+        CPY #$05            ; less than 5?
+        BCC ALTR1           ; if so, get next
+ALTRX   JMP STRT            ; start over
 
-        ; [>]
+; alter memory [>]
+; ----------------
 ALTM    BCS ALTMX
         JSR COPY12
         LDY #0
@@ -216,21 +250,21 @@ ALTMX   LDA #$91
         JSR DISPMEM
         JMP STRT
 
-        ; [G]
-GOTO    LDX SP
-        TXS
-GOTO2   JSR COPY1P
-        SEI
-        LDA PCH
+; goto (run) [G]
+GOTO    LDX SP              ; load stack pointer from memory
+        TXS                 ; save in stack pointer
+GOTO2   JSR COPY1P          ; copy first parameter to PC
+        SEI                 ; disable interrupts
+        LDA PCH             ; push pc high byte on stack
         PHA
-        LDA PCL
+        LDA PCL             ; push pc low byte on stack
         PHA
-        LDA SR
+        LDA SR              ; push status byte on stack
         PHA
-        LDA ACC
-        LDX XR
-        LDY YR
-        RTI
+        LDA ACC             ; load accumulator from memory
+        LDX XR              ; load X from memory
+        LDY YR              ; load Y from memory
+        RTI                 ; return from interrupt (pops PC and SR)
 
         ; [J]
 JSUB    LDX SP
@@ -244,44 +278,47 @@ JSUB    LDX SP
         STA SR
         JMP DSPLYR
 
-        ; DISPLAY MEMORY
-DISPMEM JSR CRLF
-        LDA #">"
+; display 8 bytes of memory
+; -------------------------
+DISPMEM JSR CRLF            ; new line
+        LDA #">"            ; prefix > so memory can be edited
         JSR CHROUT
-        JSR SHOWAD
+        JSR SHOWAD          ; show address
         LDY #0
-        BEQ DMEMGO
-DMEMLP  JSR SPACE
-DMEMGO  LDA (TMP2),Y
-        JSR WRTWO
-        INY 
-        CPY #8
-        BCC DMEMLP
-        LDY #MSG5-MSGBAS
+        BEQ DMEMGO          ; skip space on first byte
+DMEMLP  JSR SPACE           ; print space between bytes
+DMEMGO  LDA (TMP2),Y        ; second address indexed by Y
+        JSR WRTWO           ; output hex for byte
+        INY                 ; next byte
+        CPY #8              ; have we output 8 bytes yet?
+        BCC DMEMLP          ; if not, output next byte
+        LDY #MSG5-MSGBAS    ; if so, output : and RVS ON
         JSR SNDMSG
-        LDY #0
-DCHAR   LDA (TMP2),Y
-        TAX
-        AND #$BF
-        CMP #$22
-        BEQ DDOT
-        TXA
-        AND #$7F
-        CMP #$20
-        TXA
-        BCS DCHROK
-DDOT    LDA #$2E
+        LDY #0              ; back to first byte in line
+DCHAR   LDA (TMP2),Y        ; load byte
+        TAX                 ; put in X
+        AND #$BF            ; clear 6th bit
+        CMP #$22            ; is it a quote (")
+        BEQ DDOT            ; if so, print . instead
+        TXA                 ; if not, restore character
+        AND #$7F            ; clear top bit
+        CMP #$20            ; is it a printable character (>= $20)?
+        TXA                 ; restore character
+        BCS DCHROK          ; if printable, output character
+DDOT    LDA #$2E            ; if not, output '.' instaed
 DCHROK  JSR CHROUT
-        INY 
-        CPY #8
-        BCC DCHAR
+        INY                 ; next byte
+        CPY #8              ; have we output 8 bytes yet?
+        BCC DCHAR           ; if not, output next byte
         RTS 
 
-        ; [C]
+; compare memory [C]
+; ------------------
 COMPAR  LDA #0
         .BYTE $2C
 
-        ; [T]
+; transfer memory [T]
+; -------------------
 TRANS   LDA #$80
         STA SAVY
         LDA #0
@@ -814,243 +851,257 @@ PRMN2   ASL STORE+1
         BNE PRMN1
         JMP SPACE
 
-        ; READ PARAMETER
-RDPAR   DEC CHRPNT
-
-GETPAR  JSR RDVAL
-        BCS GTERR
-        JSR GOTCHR
-        BNE CKTERM
-        DEC CHRPNT
-        LDA DIGCNT
-        BNE GETGOT
-        BEQ GTNIL
-CKTERM  CMP #$20
-        BEQ GETGOT
+; read parameters
+; ---------------
+RDPAR   DEC CHRPNT      ; back up one char
+GETPAR  JSR RDVAL       ; read the value
+        BCS GTERR       ; carry set indicates error
+        JSR GOTCHR      ; check previous character
+        BNE CKTERM      ; if it's not null, check if it's a valid terminator
+        DEC CHRPNT      ; back up one char
+        LDA DIGCNT      ; get number of digits read
+        BNE GETGOT      ; found some digits
+        BEQ GTNIL       ; didn't find any digits
+CKTERM  CMP #$20        ; space or , are valid terminators...
+        BEQ GETGOT      ; anything else is an error
         CMP #","
         BEQ GETGOT
-GTERR   PLA 
-        PLA
-        JMP ERROR
-GTNIL   SEC 
-        .BYTE $24
-GETGOT  CLC 
-        LDA DIGCNT
-        RTS
+GTERR   PLA             ; encountered error
+        PLA             ; get rid of command vector pushed on stack
+        JMP ERROR       ; handle error
+GTNIL   SEC             ; set carry to indicate no parameter found
+        .BYTE $24       ; BIT ZP opcode consumes CLC instruction as operand
+GETGOT  CLC             ; clear carry to indicate paremeter returned
+        LDA DIGCNT      ; return number of digits in A
+        RTS             ; return to address pushed from vector table
 
-        ; READ VALUE
-RDVAL   LDA #0
+; read a value in the specified base
+; ----------------------------------
+RDVAL   LDA #0          ; clear temp
         STA TMP0
         STA TMP0+1
-        STA DIGCNT
-        TXA
+        STA DIGCNT      ; clear digit counter
+        TXA             ; save X and Y
         PHA
         TYA
         PHA
-RDVMOR  JSR GETCHR
-        BEQ RDNILK
-        CMP #$20
+RDVMOR  JSR GETCHR      ; get next character from input buffer
+        BEQ RDNILK      ; null at end of buffer
+        CMP #$20        ; skip spaces
         BEQ RDVMOR
-        ; CHECK NUMERIC MODE
-        LDX #3
+        LDX #3          ; check numeric base [$+&%]
 GNMODE  CMP HIKEY,X
-        BEQ GOTMOD
+        BEQ GOTMOD      ; got a match, set it up
         DEX
-        BPL GNMODE
-        INX
-        DEC CHRPNT
-GOTMOD  LDY MODTAB,X
-        LDA LENTAB,X
-        STA NUMBIT
-
-        ; GET DIGIT
-NUDIG   JSR GETCHR
-RDNILK  BEQ RDNIL
+        BPL GNMODE      ; check next base
+        INX             ; default to decimal
+        DEC CHRPNT      ; back up one character
+GOTMOD  LDY MODTAB,X    ; get base
+        LDA LENTAB,X    ; get bits per digit
+        STA NUMBIT      ; store bits per digit 
+NUDIG   JSR GETCHR      ; get next char in A
+RDNILK  BEQ RDNIL       ; end of number if no more characters
         SEC
-        SBC #$30
-        BCC RDNIL
+        SBC #$30        ; subtract ascii value of 0 to get numeric value
+        BCC RDNIL       ; end of number if character was less than 0
         CMP #$0A
-        BCC DIGMOR
-        SBC #$07
-        CMP #$10
+        BCC DIGMOR      ; not a hex digit if less than A
+        SBC #$07        ; 7 chars between ascii 9 and A, so subtract 7
+        CMP #$10        ; end of number if char is greater than F
         BCS RDNIL
-DIGMOR  STA INDIG
-        CPY INDIG
-        BCC RDERR
+DIGMOR  STA INDIG       ; store the digit
+        CPY INDIG       ; compare base with the digit
+        BCC RDERR       ; error if the digit >= the base
         BEQ RDERR
-        INC DIGCNT
+        INC DIGCNT      ; increment the number of digits
         CPY #10
-        BNE NODECM
+        BNE NODECM      ; skip the next part if not using base 10
         LDX #1
-DECLP1  LDA TMP0,X
+DECLP1  LDA TMP0,X      ; stash the previous 16-bit value for later use
         STA STASH,X
         DEX
         BPL DECLP1
-NODECM  LDX NUMBIT
-TIMES2  ASL TMP0
+NODECM  LDX NUMBIT      ; number of bits to shift
+TIMES2  ASL TMP0        ; shift 16-bit value by specified number of bits
         ROL TMP0+1
-        BCS RDERR
+        BCS RDERR       ; error if we overflowed 16 bits
         DEX
-        BNE TIMES2
+        BNE TIMES2      ; shift remaining bits
         CPY #10
-        BNE NODEC2
-        ASL STASH
+        BNE NODEC2      ; skip the next part if not using base 10
+        ASL STASH       ; shift the previous 16-bit value one bit left
         ROL STASH+1
-        BCS RDERR
-        LDA STASH
+        BCS RDERR       ; error if we overflowed 16 bits
+        LDA STASH       ; add shifted previous value to current value
         ADC TMP0
         STA TMP0
         LDA STASH+1
         ADC TMP0+1
         STA TMP0+1
-        BCS RDERR
+        BCS RDERR       ; error if we overflowed 16 bits
 NODEC2  CLC 
-        LDA INDIG
-        ADC TMP0
-        STA TMP0
-        TXA
-        ADC TMP0+1
-        STA TMP0+1
-        BCC NUDIG
-RDERR   SEC 
-        .BYTE $24
-RDNIL   CLC 
-        STY NUMBIT
-        PLA
+        LDA INDIG       ; load current digit
+        ADC TMP0        ; add current digit to low byte
+        STA TMP0        ; and store result in low byte
+        TXA             ; A=0
+        ADC TMP0+1      ; add carry to high byte
+        STA TMP0+1      ; and store result in high byte
+        BCC NUDIG       ; get next digit if we didn't overflow
+RDERR   SEC             ; set carry to indicate error
+        .BYTE $24       ; BIT ZP opcode consumes CLC instruction as operand
+RDNIL   CLC             ; clear carry to indicate success
+        STY NUMBIT      ; save number of bits
+        PLA             ; restore X and Y
         TAY
         PLA
         TAX
-        LDA DIGCNT
+        LDA DIGCNT      ; return number of digits in A
         RTS
 
+; print address
+; -------------
 SHOWAD  LDA TMP2
         LDX TMP2+1
 
-        ; PRINT ADDRESS
-WRADDR  PHA 
-        TXA
-        JSR WRTWO
-        PLA
+WRADDR  PHA             ; save low byte
+        TXA             ; put high byte in A
+        JSR WRTWO       ; output high byte
+        PLA             ; restore low byte
 
-WRBYTE  JSR WRTWO
+WRBYTE  JSR WRTWO       ; output byte in A
 
-SPACE   LDA #$20
+SPACE   LDA #$20        ; output space
         BNE FLIP
 
-CHOUT   CMP #$0D
+CHOUT   CMP #$0D        ; output char with special handling of CR
         BNE FLIP
-CRLF    LDA #$0D
-        BIT $13
-        BPL FLIP
-        JSR CHROUT
-        LDA #$0A
+CRLF    LDA #$0D        ; load CR in A
+        BIT $13         ; check default channel
+        BPL FLIP        ; if high bit is clear output CR only
+        JSR CHROUT      ; otherwise output CR+LF
+        LDA #$0A        ; output LF
 FLIP    JMP CHROUT
 
-FRESH   JSR CRLF
-        LDA #$20
+FRESH   JSR CRLF        ; output CR
+        LDA #$20        ; load space in A
         JSR CHROUT
         JMP SNCLR
 
-WRTWO   STX SAVX
-        JSR ASCTWO
-        JSR CHROUT
-        TXA
-        LDX SAVX
-        JMP CHROUT
+; output two hex digits for byte
+; ------------------------------
+WRTWO   STX SAVX        ; save X
+        JSR ASCTWO      ; get hex chars for byte in X (lower) and A (upper)
+        JSR CHROUT      ; output upper nybble
+        TXA             ; transfer lower to A
+        LDX SAVX        ; restore X
+        JMP CHROUT      ; output lower nybble
 
-ASCTWO  PHA 
-        JSR ASCII
-        TAX
-        PLA
-        LSR A
+; convert byte in A to hex digits
+; -------------------------------
+ASCTWO  PHA             ; save byte
+        JSR ASCII       ; do low nybble
+        TAX             ; save in X
+        PLA             ; restore byte
+        LSR A           ; shift upper nybble down
         LSR A
         LSR A
         LSR A
 
-ASCII   AND #$0F
-        CMP #$0A
+; convert low nibble in A to hex digit
+; ------------------------------------
+ASCII   AND #$0F        ; clear upper nibble
+        CMP #$0A        ; if less than A, skip next step
         BCC ASC1
-        ADC #6
-ASC1    ADC #$30
+        ADC #6          ; skip ascii chars between 9 and A
+ASC1    ADC #$30        ; add ascii char 0 to value
         RTS
 
-        ; GET PREV CHAR
+; get prev char from input buffer
+; -------------------------------
 GOTCHR  DEC CHRPNT
 
-        ; GET NEXT CHAR
-GETCHR  STX SAVX
-        LDX CHRPNT
-        LDA INBUFF,X
-        BEQ NOCHAR
-        CMP #":"
+; get next char from input buffer
+; -------------------------------
+GETCHR  STX SAVX        ; save X
+        LDX CHRPNT      ; get pointer to next char
+        LDA INBUFF,X    ; load next char in A
+        BEQ NOCHAR      ; null, :, or ? signal end of buffer
+        CMP #":"        
         BEQ NOCHAR
         CMP #"?"
-NOCHAR  PHP 
-        INC CHRPNT
-        LDX SAVX
-        PLP
+NOCHAR  PHP
+        INC CHRPNT      ; next char
+        LDX SAVX        ; restore X
+        PLP             ; Z flag will indicate end of buffer
         RTS
 
-        ; TRANSFR ADDR1 TO ADDR2
-COPY12  LDA TMP0
+; transfr ADDR1 to ADDR2
+; ----------------------
+COPY12  LDA TMP0        ; low byte
         STA TMP2
-        LDA TMP0+1
+        LDA TMP0+1      ; high byte
         STA TMP2+1
         RTS
-        ; SUBTRACT ADDR2 FROM ADDR1
-SUB12   SEC 
-        LDA TMP0
-        SBC TMP2
-        STA TMP0
-        LDA TMP0+1
-        SBC TMP2+1
-        STA TMP0+1
+
+; subtract ADDR2 from ADDR1
+; -------------------------
+SUB12   SEC             ; set carry
+        LDA TMP0        ; load addr1 low byte
+        SBC TMP2        ; subtract addr2 low byte
+        STA TMP0        ; put it back in addr1
+        LDA TMP0+1      ; load addr1 high byte
+        SBC TMP2+1      ; subtract addr2 high byte
+        STA TMP0+1      ; put it back in addr1
         RTS
 
-SUBA1   LDA #1
 
-        ; SUBTRACT FROM ADDR1
-SUBA2   STA SAVX
-        SEC
-        LDA TMP0
-        SBC SAVX
-        STA TMP0
-        LDA TMP0+1
-        SBC #0
-        STA TMP0+1
+; subtract from ADDR1
+; -------------------
+SUBA1   LDA #1          ; decrement by 1
+SUBA2   STA SAVX        ; save accumulator
+        SEC             ; set carry
+        LDA TMP0        ; load addr1 low byte
+        SBC SAVX        ; subtract saved value from it
+        STA TMP0        ; put it back
+        LDA TMP0+1      ; load high byte
+        SBC #0          ; handle borrow
+        STA TMP0+1      ; put it back
         RTS
 
-        ; SUBTRACT 1 FROM ADDR3
-SUB13   SEC 
-        LDA STORE
-        SBC #1
-        STA STORE
-        LDA STORE+1
-        SBC #0
-        STA STORE+1
+; subtract 1 from ADDR3
+; ---------------------
+SUB13   SEC             ; set carry
+        LDA STORE       ; load addr3 low byte
+        SBC #1          ; decrement
+        STA STORE       ; put it back
+        LDA STORE+1     ; load high byte
+        SBC #0          ; handle borrow
+        STA STORE+1     ; put it back
         RTS
 
-        ; ADD TO ADDR2
-ADDA2   LDA #1
-
-BUMPAD2 CLC 
-        ADC TMP2
-        STA TMP2
-        BCC BUMPEX
-        INC TMP2+1
+; add to ADDR2
+; ------------
+ADDA2   LDA #1          ; increment by 1
+BUMPAD2 CLC             ; clear carry
+        ADC TMP2        ; add accumulator to TMP2 low byte
+        STA TMP2        ; store back in TMP2
+        BCC BUMPEX      ; return if no carry
+        INC TMP2+1      ; else, increment high byte
 BUMPEX  RTS 
 
-        ; SUBTRACT 1 FROM ADDR2
-SUB21   SEC 
-        LDA TMP2
-        SBC #1
-        STA TMP2
-        LDA TMP2+1
-        SBC #0
-        STA TMP2+1
+; subtract 1 from ADDR2
+; ---------------------
+SUB21   SEC             ; set carry
+        LDA TMP2        ; load addr2 low byte
+        SBC #1          ; subtact 1
+        STA TMP2        ; put it back
+        LDA TMP2+1      ; load addr2 high byte
+        SBC #0          ; handle carry
+        STA TMP2+1      ; put it back
         RTS
 
-        ; COPY ADDR1 TO PC
+; copy ADDR1 to PC
+; ----------------
 COPY1P  BCS CPY1PX
         LDA TMP0
         LDY TMP0+1
@@ -1077,7 +1128,8 @@ GETDIF  BCS GDIFX
 GDIFX   SEC 
         RTS
 
-        ; [$+&%]
+; convert base [$+&%]
+; -------------------
 CONVRT  JSR RDPAR
         JSR FRESH
         LDA #"$"
@@ -1270,47 +1322,52 @@ DREXIT  JSR UNTLK
         JSR UNLSN
         JMP STRT
 
-        ; PRINT AND CLEAR ROUTINES
-CLINE   JSR CRLF
-        JMP SNCLR
+; print and clear routines
+; ------------------------
+CLINE   JSR CRLF                ; send CR+LF
+        JMP SNCLR               ; clear line
 SNDCLR  JSR SNDMSG
-SNCLR   LDY #$28
-SNCLP   LDA #$20
+SNCLR   LDY #$28                ; loop 40 times
+SNCLP   LDA #$20                ; output space character
         JSR CHROUT
-        LDA #$14
+        LDA #$14                ; output delete character
         JSR CHROUT
         DEY
         BNE SNCLP
         RTS
-SNDMSG  LDA MSGBAS,Y
+
+; display message from table
+; --------------------------
+SNDMSG  LDA MSGBAS,Y            ; Y contains offset in msg table
         PHP
-        AND #$7F
+        AND #$7F                ; strip high bit before output
         JSR CHOUT
         INY
         PLP
-        BPL SNDMSG
+        BPL SNDMSG              ; loop until high bit is set
         RTS
 
+; message table, last character has high bit set
+; ----------------------------------------------
 MSGBAS  =*
-
-MSG2    .BYTE $0D
+MSG2    .BYTE $0D               ; header for registers
         .TEXT "   PC  SR AC XR YR SP   V1.2"
         .BYTE $0D+$80
-MSG3    .BYTE $1D,$3F+$80
-MSG4    .TEXT "..SYS"
+MSG3    .BYTE $1D,$3F+$80       ; syntax error: move right, display "?"
+MSG4    .TEXT "..SYS"           ; SYS call to enter monitor
         .BYTE $20+$80
-MSG5    .BYTE $3A,$12+$80
-MSG6    .TEXT " ERRO"
+MSG5    .BYTE $3A,$12+$80       ; ":" then RVS ON for memory ASCII dump
+MSG6    .TEXT " ERRO"           ; I/O error: display " ERROR"
         .BYTE "R"+$80
-MSG7    .BYTE $41,$20+$80
-MSG8    .TEXT "  "
+MSG7    .BYTE $41,$20+$80       ; assemble next instruction: "A " + addr
+MSG8    .TEXT "  "              ; pad non-existent byte: skip 3 spaces
         .BYTE $20+$80
 
-        ; MODE TABLE... NYBBLE ORGANIZED
-        ; 0=ERR  4=IMPLIED  8=ZER,X  C=ZER,Y
-        ; 1=IMM  5=ACC      8=ABS,X  D=REL
-        ; 2=ZER  6=(IND,X)  A=ABS,Y
-        ; 3=ABS  7=(IND),Y  B=(IND)
+; MODE TABLE... NYBBLE ORGANIZED
+; 0=ERR  4=IMPLIED  8=ZER,X  C=ZER,Y
+; 1=IMM  5=ACC      8=ABS,X  D=REL
+; 2=ZER  6=(IND,X)  A=ABS,Y
+; 3=ABS  7=(IND),Y  B=(IND)
 MODE    .BYTE $40,$02,$45,$03
         .BYTE $D0,$08,$40,$09
         .BYTE $30,$22,$45,$33
@@ -1373,20 +1430,22 @@ MNEMR   .BYTE $D8,$62,$5A,$48
         .BYTE $C4,$CA,$26,$48
         .BYTE $44,$44,$A2,$C8
         .BYTE $0D,$20,$20,$20
+
+; single-character commands
+; -------------------------
 KEYW    .TEXT "ACDFGHJMRTX@.>;"
 HIKEY   .TEXT "$+&%LSV"
 KEYTOP  =*
 
-        ; VECTORS
+; command vectors
+; ---------------
 KADDR   .WORD ASSEM-1,COMPAR-1,DISASS-1,FILL-1
         .WORD GOTO-1,HUNT-1,JSUB-1,DSPLYM-1
         .WORD DSPLYR-1,TRANS-1,EXIT-1,DSTAT-1
         .WORD ASSEM-1,ALTM-1,ALTR-1
 
-        ; MODULO NUMBER SYSTEMS
-MODTAB  .BYTE $10,$0A,$08,02
+MODTAB  .BYTE $10,$0A,$08,02    ; modulo number systems
+LENTAB  .BYTE $04,$03,$03,$01   ; bits per digit
 
-        ; BITS PER NUMBER SYSTEM
-LENTAB  .BYTE $04,$03,$03,$01
-LINKAD  .WORD BREAK
-SUPAD   .WORD SUPER
+LINKAD  .WORD BREAK             ; address of brk handler
+SUPAD   .WORD SUPER             ; address of entry point
