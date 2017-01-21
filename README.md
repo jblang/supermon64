@@ -25,8 +25,10 @@ The original files extracted from the SDA:
 Converted versions of the original files:
 - [supermon64 docs.txt](supermon64 docs.txt) is the PETSCII documentation converted to ASCII.
 - [supermon64.src.txt](supermon64.src.txt) is the PETSCII source converted to ASCII.
-- [supermon64.asm](supermon64.asm) is the source with fixed indentation and minor tweaks to get it to build successfully in [64tass](https://sourceforge.net/projects/tass64/) and [TMPx](http://style64.org/release/tmpx-v1.1.0-style).  I tested the resulting program and it seems to work, but I can't guarantee it's 100% correct.
+- [supermon64.asm](supermon64.asm) is the source with fixed indentation and minor tweaks to get it to build successfully in [64tass](https://sourceforge.net/projects/tass64/) and [TMPx](http://style64.org/release/tmpx-v1.1.0-style).  I tested the resulting program and it works, but I can't guarantee it's 100% correct.  I have worked my way through the code and commented it to the best of my understanding. The comments are still a work in progress.
 
 ## License
 
 Based on multiple sources, this software appears to be in the public domain.  I claim no ownership.
+
+The comments in supermon64.asm are my own. I hereby place them in the public domain. However, I would greatly appreciate attribution if you make use of them.
