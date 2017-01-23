@@ -37,7 +37,7 @@ BKVEC   = $0316     ; BRK instruction vector (official name CBINV)
         *= $0100    ; store variables in tape error buffer
 
 ; -----------------------------------------------------------------------------
-; 
+; variables
 ACMD    .FILL 1     ; addressing command
 LENGTH  .FILL 1     ; length of operand
 MNEMW   .FILL 3     ; 3 letter mnemonic buffer
@@ -533,25 +533,7 @@ FSTART  JMP STRT            ; back to main loop
 ; -----------------------------------------------------------------------------
 ; assemble [A.]
 
-; U0AA0 is the assembler work buffer. The first two bytes contain the three
-; mnemonic characters encoded in 5 bits each (the only valid values are A-Z)
-; so the full ASCII range isn't needed.  After the compressed mnemonic, the
-; remaining bytes with contain the general format of the operand, which will
-; be one of the following:
-;
-;   #$00    immediate
-;   $00     zero-page
-;   $00,X   zero-page,X
-;   $00,Y   zero-page,Y
-;   $0000   absolute
-;   $0000,X absolute,X
-;   $0000,Y absolute,Y
-;   ($00,X) indirect,X
-;   ($00),Y indirect,Y
-;   ($0000) indirect
-;   A       accumulator
-;           implied
-
+; read in mnemonic
 ASSEM   BCS AERROR          ; error if no address given
         JSR COPY12          ; copy address to TMP2
 AGET1   LDX #0
@@ -567,11 +549,13 @@ ALMOR   CMP #$20            ; skip leading spaces
         INX
         CPX #3              ; have we read 3 characters yet?
         BNE AGET2           ; if not, get next character
+
+; compress mnemonic into two bytes
 ASQEEZ  DEX                 ; move to previous char
         BMI AOPRND          ; if we're done with mnemonic, look for operand
         LDA MNEMW,X         ; get current character
         SEC                 ; pack 3-letter mnemonic into 2 bytes (15 bits)
-        SBC #$3F            ; subtract $3F from ascii code so that A=1 and Z=26
+        SBC #$3F            ; subtract $3F from ascii code so A-Z = 2 to 27
         LDY #$05            ; letters now fit in 5 bits; shift them out
 ASHIFT  LSR A               ;   into the first two bytes of the inst buffer
         ROR U0AA0+1         ; catch the low bit from accumulator in U0AA0[1]
@@ -580,19 +564,21 @@ ASHIFT  LSR A               ;   into the first two bytes of the inst buffer
         BNE ASHIFT          ; keep looping until we reach zero
         BEQ ASQEEZ          ; unconditional branch to handle next char
 AERROR  JMP ERROR           ; handle error
+
+; parse operand
 AOPRND  LDX #2              ; mnemonic is in first two bytes so start at third
-ASCAN   LDA DIGCNT          ; how many digits did we process last time?
-        BNE AFORM1          ; if none, look for mode chars
-        JSR RDVAL           ; otherwise, try to read another numeric value
-        BEQ AFORM0          ; zero flag indicates empty value
+ASCAN   LDA DIGCNT          ; did we find address digits last time?
+        BNE AFORM1          ; if so, look for mode chars
+        JSR RDVAL           ; otherwise, look for an address
+        BEQ AFORM0          ; we didn't find an address, look for characters
         BCS AERROR          ; carry flag indicates error
         LDA #"$"
         STA U0AA0,X         ; prefix addresses with $
-        INX
+        INX                 ; next position in buffer
         LDY #4              ; non-zero page addresses are 4 hex digits
         LDA NUMBIT          ; check numeric base in which address was given
-        CMP #8
-        BCC AADDR           ; for octal or less use high byte to determine page
+        CMP #8              ; for addresses given in octal or binary
+        BCC AADDR           ;   use only the high byte to determine page
         CPY DIGCNT          ; for decimal or hex, force non-zero page addressing
         BEQ AFILL0          ;   if address was given with four digits or more 
 AADDR   LDA TMP0+1          ; check whether high byte of address is zero
@@ -613,7 +599,9 @@ AFORM1  JSR GETCHR          ; get next character
         CPX #U0AAE-U0AA0    ; is instruction buffer full?
         BCC ASCAN           ; if not, keep scanning
         BCS AERROR          ; error if buffer is full
-AESCAN  STX STORE           ; save X
+
+; find matching opcode
+AESCAN  STX STORE           ; save number of bytes in assembly buffer
         LDX #0              ; start at opcode $00 and check every one until
         STX OPCODE          ;   we find one that matches our criteria
 ATRYOP  LDX #0
@@ -627,76 +615,80 @@ ATRYOP  LDX #0
         JSR CHEKOP
         LDA MNEML,X         ; check left byte of compressed mnemonic
         JSR CHEKOP
-        LDX #6
-TRYIT   CPX #3
-        BNE TRYMOD
-        LDY LENGTH
-        BEQ TRYMOD
-TRYAD   LDA ACMD
-        CMP #$E8
-        LDA #$30
-        BCS TRY4B
-        JSR CHEK2B
-        DEY
-        BNE TRYAD
-TRYMOD  ASL ACMD
-        BCC UB4DF
+        LDX #6              ; 6 possible characters to check against operand
+TRYIT   CPX #3              ; are we on character 3?
+        BNE TRYMOD          ; if not, check operand characters
+        LDY LENGTH          ; otherwise, check number of bytes in operand
+        BEQ TRYMOD          ; if zero, check operand characters
+TRYAD   LDA ACMD            ; otherwise, look for an address
+        CMP #$E8            ; special case for relative addressing mode
+                            ;   since it's specified with 4 digits in assembly
+                            ;   but encoded with only 1 byte in object code
+        LDA #$30            ; '0' is the digit placeholder we're looking for
+        BCS TRY4B           ; ACMD >= $E8 indicates relative addressing
+        JSR CHEK2B          ; ACMD < $E8 indicates normal addressing
+        DEY                 ; consume byte
+        BNE TRYAD           ; check for 2 more digits if not zero-page
+TRYMOD  ASL ACMD            ; shift a bit out of the addressing command
+        BCC UB4DF           ; if it's zero, skip checking current character
         LDA CHAR1-1,X
-        JSR CHEKOP
-        LDA CHAR2-1,X
-        BEQ UB4DF
-        JSR CHEKOP
-UB4DF   DEX
-        BNE TRYIT
+        JSR CHEKOP          ; otherwise first character against operand
+        LDA CHAR2-1,X       ; get second character to check
+        BEQ UB4DF           ; if it's zero, skip checking it
+        JSR CHEKOP          ; otherwise check it against hte operand
+UB4DF   DEX                 ; move to next character
+        BNE TRYIT           ; repeat tests
         BEQ TRYBRAN
+TRY4B   JSR CHEK2B          ; check for 4 digit address placeholder
+        JSR CHEK2B          ;   by checking for 2 digits twice
+TRYBRAN LDA STORE           ; get number of bytes in assembly buffer
+        CMP U9F             ; more bytes left to check?
+        BEQ ABRAN           ; if not, we've found a match; build instruction
+        JMP BUMPOP          ; if so, this opcode doesn't match; try the next
 
-TRY4B   JSR CHEK2B
-        JSR CHEK2B
-TRYBRAN LDA STORE           ; check current position within buffer
-        CMP U9F
-        BEQ ABRAN
-        JMP BUMPOP
-        ; CHECK BRANCH
-ABRAN   LDY LENGTH
-        BEQ A1BYTE
-        LDA STORE+1
-        CMP #$9D
-        BNE OBJPUT
-        LDA TMP0
-        SBC TMP2
-        TAX
-        LDA TMP0+1
+; convert branches to relative address
+ABRAN   LDY LENGTH          ; get number of bytes in operand
+        BEQ A1BYTE          ; if none, just output the opcode
+        LDA STORE+1         ; otherwise check the address format
+        CMP #$9D            ; is it a relative branch?
+        BNE OBJPUT          ; if not, skip relative branch calculation
+        LDA TMP0            ; calculate the difference between the current
+        SBC TMP2            ;   address and the branch target (low byte)
+        TAX                 ; save it in X
+        LDA TMP0+1          ; borrow from the high byte if necessary
         SBC TMP2+1
-        BCC ABBACK
-        BNE SERROR
-        CPX #$82
-        BCS SERROR
+        BCC ABBACK          ; if result is negative, we're branching back
+        BNE SERROR          ; high bytes must be equal when branching forward
+        CPX #$82            ; difference between low bytes must be < 130
+        BCS SERROR          ; error if the address is too far away
         BCC ABRANX
-ABBACK  TAY
-        INY
-        BNE SERROR
-        CPX #$82
-        BCC SERROR
-ABRANX  DEX
-        DEX
+ABBACK  TAY                 ; when branching backward high byte of target must
+        INY                 ;   be 1 less than high byte of current address
+        BNE SERROR          ; if not, it's too far away
+        CPX #$82            ; difference between low bytes must be < 130
+        BCC SERROR          ; if not, it's too far away
+ABRANX  DEX                 ; adjust branch target relative to the 
+        DEX                 ;   instruction following this one
         TXA
-        LDY LENGTH
+        LDY LENGTH          ; load length of operand
         BNE OBJP2
-OBJPUT  LDA TMP0-1,Y
+
+; assemble machine code
+OBJPUT  LDA TMP0-1,Y        ; put bytes from operand into instruction
 OBJP2   STA (TMP2),Y
         DEY
         BNE OBJPUT
-A1BYTE  LDA OPCODE
+A1BYTE  LDA OPCODE          ; put opcode into instruction
         STA (TMP2),Y
-        JSR CRLF
-        LDA #$91
+        JSR CRLF            ; carriage return
+        LDA #$91            ; back up one line
         JSR CHROUT
-        LDY #MSG7-MSGBAS
-        JSR SNDCLR
-        JSR DISLIN
-        INC LENGTH
-        LDA LENGTH
-        JSR BUMPAD2
+        LDY #MSG7-MSGBAS    ; "A " prefix
+        JSR SNDCLR          ; clear line
+        JSR DISLIN          ; disassemble the instruction we just assembled
+        INC LENGTH          ; instruction length = operand length + 1 byte
+        LDA LENGTH          ;   for the opcode
+        JSR BUMPAD2         ; increment address by length of instruction
         LDA #"A"            ; stuff keyboard buffer with next assemble command:
         STA KEYD            ;   "A XXXX " where XXXX is the next address
         LDA #" "            ;   after the previously assembled instruction
@@ -715,8 +707,8 @@ A1BYTE  LDA OPCODE
         JMP STRT
 SERROR  JMP ERROR
 
+; check characters in operand
 CHEK2B  JSR CHEKOP          ; check two bytes against value in accumulator
-
 CHEKOP  STX SAVX            ; stash X
         LDX U9F             ; get current index into work buffer
         CMP U0AA0,X         ; check whether this opcode matches the buffer
@@ -827,19 +819,20 @@ RELC3   RTS
 
 ; Note: the labels are different, but the code of this subroutine is almost
 ; identical to the INSDS2 subroutine of the Apple Mini-Assembler on page 78 of
-; the Apple II Red Book. It's hard to say exactly where this code originated
-; (MOS or Apple) but it's clear that it this code and the Mini-Asssembler
-; share a common heritage.  Woz's comments showing the opcode formats were 
-; helpful in understanding what this code does, so I've duplicated them here.
+; the Apple II Red Book. I'm not sure exactly where this code originated
+; (MOS or Apple) but it's clear that this part of Supermon64 and the 
+; Mini-Asssembler share a common heritage.  The comments showing the way the 
+; opcodes are transformed into indexes for the mnemonic lookup table come
+; from the Mini-Assembler source.
 
 INSTXX  TAY                 ; stash opcode in accumulator in Y for later
         LSR A               ; is opcode even or odd?
         BCC IEVEN
         LSR A
-        BCS ERR             ; opcode XXXXXX11 invalid
+        BCS ERR             ; invalid opcodes XXXXXX11
         CMP #$22
-        BEQ ERR             ; opcode 10001001 invalid
-        AND #$07            ; mask bits 100XXX
+        BEQ ERR             ; invalid opcode 10001001
+        AND #$07            ; mask bits to 10000XXX
         ORA #$80
 IEVEN   LSR A               ; LSB determines whether to use left/right nybble
         TAX                 ; get format index using remaining high bytes
@@ -854,48 +847,48 @@ RTMODE  AND #$0F            ; if carry = 1, use right nybble for addressing mode
 ERR     LDY #$80            ; substitute 10000000 for invalid opcodes
         LDA #0
 GETFMT  TAX
-        LDA MODE2,X         ; lookup addressing format using selected nybble
+        LDA MODE2,X         ; lookup operand format using selected nybble
         STA ACMD            ; save for later use
-        AND #$03            ; lower 3 bits indicate length
+        AND #$03            ; lower 2 bits indicate number of bytes in operand
         STA LENGTH
         TYA                 ; restore original opcode
-        AND #$8F            ; mask bits X000XXXX
+        AND #$8F            ; mask bits to X000XXXX
         TAX                 ; save it
         TYA                 ; restore original opcode
         LDY #3
         CPX #$8A            ; check if opcode = 1XXX1010
         BEQ GTFM4
-GTFM2   LSR A               ; form index into mnemonic table
+GTFM2   LSR A               ; transform opcode into index for mnemonic table
         BCC GTFM4
-        LSR A
-GTFM3   LSR A               ; 1) 1XXX1010->00101XXX
-        ORA #$20            ; 2) XXXYYY01->00111XXX
-        DEY                 ; 3) XXXYYY10->00111XXX
-        BNE GTFM3           ; 4) XXXYY100->00110XXX
-        INY                 ; 5) XXXXX000->000XXXXX
+        LSR A               ; opcodes transformed as follows:
+GTFM3   LSR A               ; 1XXX1010->00101XXX
+        ORA #$20            ; XXXYYY01->00111XXX
+        DEY                 ; XXXYYY10->00111XXX
+        BNE GTFM3           ; XXXYY100->00110XXX
+        INY                 ; XXXXX000->000XXXXX
 GTFM4   DEY
         BNE GTFM2
         RTS
 
 ; -----------------------------------------------------------------------------
 ; extract and print packed mnemonics
-PROPXX  TAY 
-        LDA MNEML,Y
+PROPXX  TAY             ; use index in accumulator to look up mnemonic
+        LDA MNEML,Y     ;   and place a temporary copy in STORE
         STA STORE
         LDA MNEMR,Y
         STA STORE+1
-PRMN1   LDA #0
-        LDY #$05
-PRMN2   ASL STORE+1
-        ROL STORE
-        ROL A
-        DEY
-        BNE PRMN2
-        ADC #$3F
-        JSR CHROUT
-        DEX
-        BNE PRMN1
-        JMP SPACE
+PRMN1   LDA #0          ; clear accumulator
+        LDY #$05        ; shift 5 times
+PRMN2   ASL STORE+1     ; shift right byte
+        ROL STORE       ; rotate bits from right byte into left byte
+        ROL A           ; rotate bits from left byte into accumulator
+        DEY             ; next bit
+        BNE PRMN2       ; loop until all bits shifted
+        ADC #$3F        ; calculate ascii code for letter by adding to '?'
+        JSR CHROUT      ; output letter
+        DEX             ; next letter
+        BNE PRMN1       ; loop until all 3 letters are output
+        JMP SPACE       ; output space
 
 ; -----------------------------------------------------------------------------
 ; read parameters
@@ -1413,17 +1406,12 @@ MSG8    .TEXT "  "              ; pad non-existent byte: skip 3 spaces
         .BYTE $20+$80
 
 ; -----------------------------------------------------------------------------
-; addressing mode table - nybble organized
-; for instructions with bits XXXXXXY0 
+; addressing mode table - nybbles provide index into MODE2 table
+; for opcodes XXXXXXY0, use XXXXXX as index into table
+; for opcodes WWWXXY01  use $40 + XX as index into table
 ; use right nybble if Y=0; use left nybble if Y=1
-; nybble provides index into MODE2 table
-;
-; meaning of nybble values:
-; 0=ERR  4=IMPLIED  8=ZER,X  C=ZER,Y
-; 1=IMM  5=ACC      8=ABS,X  D=REL
-; 2=ZER  6=(IND,X)  A=ABS,Y
-; 3=ABS  7=(IND),Y  B=(IND)
-MODE    .BYTE $40,$02,$45,$03
+
+MODE    .BYTE $40,$02,$45,$03   ; even opcodes
         .BYTE $D0,$08,$40,$09
         .BYTE $30,$22,$45,$33
         .BYTE $D0,$08,$40,$09
@@ -1439,15 +1427,38 @@ MODE    .BYTE $40,$02,$45,$03
         .BYTE $D0,$08,$40,$09
         .BYTE $10,$22,$44,$33
         .BYTE $D0,$08,$40,$09
-        .BYTE $62,$13,$78,$A9
+        .BYTE $62,$13,$78,$A9   ; opcodes ending in 01
 
-; actual bytes in opcode for addressing mode
-MODE2   .BYTE $00,$21,$81,$82   ; ERR       IMM     Z-PAGE      ABS
-        .BYTE $00,$00,$59,$4D   ; IMPLIED   ACC     (IND,X)     (IND),Y
-        .BYTE $91,$92,$86,$4A   ; ZER,X     ABS,X   ABS,Y       (IND)
-        .BYTE $85,$9D           ; ZER,Y     REL
+; addressing mode format definitions indexed by nybbles from MODE table
 
-; -----------------------------------------------------------------------------
+; left 6 bits define which characters appear in the assembly operand
+; left 3 bits are before the address; next 3 bits are after
+
+; right-most 2 bits define length of binary operand
+
+; index               654 321
+; 1st character       $(# ,),  
+; 2nd character        $$ X Y    length  format      idx mode
+MODE2   .BYTE $00   ; 000 000    00                  0   error
+        .BYTE $21   ; 001 000    01      #$00        1   immediate
+        .BYTE $81   ; 100 000    01      $00         2   zero-page
+        .BYTE $82   ; 100 000    10      $0000       3   absolute
+        .BYTE $00   ; 000 000    00                  4   implied
+        .BYTE $00   ; 000 000    00                  5   accumulator
+        .BYTE $59   ; 010 110    01      ($00,X)     6   indirect,X
+        .BYTE $4D   ; 010 011    01      ($00),Y     7   indirect,Y
+        .BYTE $91   ; 100 100    01      $00,X       8   zero-page,X
+        .BYTE $92   ; 100 100    10      $0000,X     9   absolute,X
+        .BYTE $86   ; 100 001    10      $0000,Y     A   absolute,Y
+        .BYTE $4A   ; 010 010    10      ($0000)     B   indirect
+        .BYTE $85   ; 100 001    01      $00,Y       C   zero-page,Y
+        .BYTE $9D   ; 100 111    01      $0000*      D   relative
+
+; * relative is special-cased so format bits don't match
+
+
+; character lookup tables for the format definitions in MODE2
+
 CHAR1   .BYTE $2C,$29,$2C       ; ","  ")"  ","
         .BYTE $23,$28,$24       ; "#"  "("  "$"
 
@@ -1455,41 +1466,53 @@ CHAR2   .BYTE $59,$00,$58       ; "Y"   0   "X"
         .BYTE $24,$24,$00       ; "$"  "$"   0
 
 ; -----------------------------------------------------------------------------
-; 3-letter mnemonics are packed into two bytes (5 bits per letter)
-; MNEML contains left 7 bits, MNEMR contains right 8 bits
-MNEML   .BYTE $1C,$8A,$1C,$23
-        .BYTE $5D,$8B,$1B,$A1
-        .BYTE $9D,$8A,$1D,$23
-        .BYTE $9D,$8B,$1D,$A1
-        .BYTE $00,$29,$19,$AE
-        .BYTE $69,$A8,$19,$23
-        .BYTE $24,$53,$1B,$23
-        .BYTE $24,$53,$19,$A1   ; XXXXX000  opcodes above
-        .BYTE $00,$1A,$5B,$5B
-        .BYTE $A5,$69,$24,$24   ; XXXYY100  opcodes
-        .BYTE $AE,$AE,$A8,$AD
-        .BYTE $29,$00,$7C,$00   ; 1XXX1010  opcodes
-        .BYTE $15,$9C,$6D,$9C
-        .BYTE $A5,$69,$29,$53   ; XXXYYY10  opcodes
-        .BYTE $84,$13,$34,$11
-        .BYTE $A5,$69,$23,$A0   ; XXXYYY01  opcodes
+; 3-letter mnemonics packed into two bytes (5 bits per letter)
 
-MNEMR   .BYTE $D8,$62,$5A,$48
-        .BYTE $26,$62,$94,$88
-        .BYTE $54,$44,$C8,$54
-        .BYTE $68,$44,$E8,$94
-        .BYTE $00,$B4,$08,$84
-        .BYTE $74,$B4,$28,$6E
-        .BYTE $74,$F4,$CC,$4A
-        .BYTE $72,$F2,$A4,$8A   ; XXXXX000 opcodes above
-        .BYTE $00,$AA,$A2,$A2
-        .BYTE $74,$74,$74,$72   ; XXXYY100 opcodes
-        .BYTE $44,$68,$B2,$32
-        .BYTE $B2,$00,$22,$00   ; 1XXX1010 opcodes
-        .BYTE $1A,$1A,$26,$26
-        .BYTE $72,$72,$88,$C8   ; XXXYYY10 opcodes
-        .BYTE $C4,$CA,$26,$48
-        .BYTE $44,$44,$A2,$C8   ; XXXYYY01 opcodes
+        ; left 8 bits
+        ; XXXXX000 opcodes
+MNEML   .BYTE $1C,$8A,$1C,$23   ; BRK PHP BPL CLC
+        .BYTE $5D,$8B,$1B,$A1   ; JSR PLP BMI SEC
+        .BYTE $9D,$8A,$1D,$23   ; RTI PHA BVC CLI
+        .BYTE $9D,$8B,$1D,$A1   ; RTS PLA BVS SEI
+        .BYTE $00,$29,$19,$AE   ; ??? DEY BCC TYA
+        .BYTE $69,$A8,$19,$23   ; LDY TAY BCS CLV
+        .BYTE $24,$53,$1B,$23   ; CPY INY BNE CLD
+        .BYTE $24,$53,$19,$A1   ; CPX INX BEQ SED
+        ; XXXYY100 opcodes
+        .BYTE $00,$1A,$5B,$5B   ; ??? BIT JMP JMP
+        .BYTE $A5,$69,$24,$24   ; STY LDY CPY CPX
+        ; 1XXX1010 opcodes
+        .BYTE $AE,$AE,$A8,$AD   ; TXA TXS TAX TSX
+        .BYTE $29,$00,$7C,$00   ; DEX ??? NOP ???
+        ; XXXYYY10 opcodes
+        .BYTE $15,$9C,$6D,$9C   ; ASL ROL LSR ROR
+        .BYTE $A5,$69,$29,$53   ; STX LDX DEC INC
+        ; XXXYYY01 opcodes
+        .BYTE $84,$13,$34,$11   ; ORA AND EOR ADC
+        .BYTE $A5,$69,$23,$A0   ; STA LDA CMP SBC
+
+        ; right 7 bits, left justified
+        ; XXXXX000 opcodes
+MNEMR   .BYTE $D8,$62,$5A,$48   ; BRK PHP BPL CLC
+        .BYTE $26,$62,$94,$88   ; JSR PLP BMI SEC
+        .BYTE $54,$44,$C8,$54   ; RTI PHA BVC CLI
+        .BYTE $68,$44,$E8,$94   ; RTS PLA BVS SEI
+        .BYTE $00,$B4,$08,$84   ; ??? DEY BCC TYA
+        .BYTE $74,$B4,$28,$6E   ; LDY TAY BCS CLV
+        .BYTE $74,$F4,$CC,$4A   ; CPY INY BNE CLD
+        .BYTE $72,$F2,$A4,$8A   ; CPX INX BEQ SED
+        ; XXXYY100 opcodes
+        .BYTE $00,$AA,$A2,$A2   ; ??? BIT JMP JMP
+        .BYTE $74,$74,$74,$72   ; STY LDY CPY CPX
+        ; 1XXX1010 opcodes
+        .BYTE $44,$68,$B2,$32   ; TXA TXS TAX TSX
+        .BYTE $B2,$00,$22,$00   ; DEX ??? NOP ???
+        ; XXXYYY10 opcodes
+        .BYTE $1A,$1A,$26,$26   ; ASL ROL LSR ROR
+        .BYTE $72,$72,$88,$C8   ; STX LDX DEC INC
+        ; XXXYYY01 opcodes
+        .BYTE $C4,$CA,$26,$48   ; ORA AND EOR ADC
+        .BYTE $44,$44,$A2,$C8   ; STA LDA CMP SBC
         .BYTE $0D,$20,$20,$20
 
 ; -----------------------------------------------------------------------------
@@ -1498,7 +1521,6 @@ KEYW    .TEXT "ACDFGHJMRTX@.>;"
 HIKEY   .TEXT "$+&%LSV"
 KEYTOP  =*
 
-; -----------------------------------------------------------------------------
 ; vectors corresponding to commands above
 KADDR   .WORD ASSEM-1,COMPAR-1,DISASS-1,FILL-1
         .WORD GOTO-1,HUNT-1,JSUB-1,DSPLYM-1
