@@ -41,14 +41,14 @@ BKVEC   = $0316     ; BRK instruction vector (official name CBINV)
 ACMD    .FILL 1     ; addressing command
 LENGTH  .FILL 1     ; length of operand
 MNEMW   .FILL 3     ; 3 letter mnemonic buffer
-SAVX    .FILL 1     ; place to save X register
-OPCODE  .FILL 1     ; work space for calculating opcode
-UPFLG   .FILL 1     ; count up (bit 7 clear) or down (bit 7 set)
+SAVX    .FILL 1     ; 1 byte temp storage, often to save X register
+OPCODE  .FILL 1     ; current opcode for assembler/disassembler
+UPFLG   .FILL 1     ; flag to count up (bit 7 clear) or down (bit 7 set)
 DIGCNT  .FILL 1     ; number of digits in number
 INDIG   .FILL 1     ; numeric value of single digit
 NUMBIT  .FILL 1     ; numeric base of input
-STASH   .FILL 2     ; place to stash values for later
-U0AA0   .FILL 10    ; assembler work buffer
+STASH   .FILL 2     ; 2-byte temp storage
+U0AA0   .FILL 10    ; work buffer
 U0AAE   =*          ; end of work buffer
 STAGE   .FILL 30    ; staging buffer for filename, search, etc.
 ESTAGE  =*          ; end of staging buffer
@@ -69,9 +69,9 @@ XR      .FILL 1     ; X register
 YR      .FILL 1     ; Y register
 SP      .FILL 1     ; stack pointer
 
-STORE   .FILL 2     ; temporary address storage
+STORE   .FILL 2     ; 2-byte temp storage
 CHRPNT  .FILL 1     ; current position in input buffer
-SAVY    .FILL 1     ; place to save Y register
+SAVY    .FILL 1     ; temp storage, often to save Y register
 U9F     .FILL 1     ; index into assembler work buffer
 
 ; -----------------------------------------------------------------------------
@@ -1168,95 +1168,95 @@ GDIFX   SEC             ; set carry to indicate error
 
 ; -----------------------------------------------------------------------------
 ; convert base [$+&%]
-CONVRT  JSR RDPAR
-        JSR FRESH
-        LDA #"$"
+CONVRT  JSR RDPAR       ; read a parameter
+        JSR FRESH       ; next line and clear
+        LDA #"$"        ; output $ sigil for hex
         JSR CHROUT
-        LDA TMP0
+        LDA TMP0        ; load the 16-bit value entered
         LDX TMP0+1
-        JSR WRADDR
+        JSR WRADDR      ; print it in 4 hex digits
         JSR FRESH
-        LDA #"+"
+        LDA #"+"        ; output + sigil for decimal
         JSR CHROUT
-        JSR CVTDEC
-        LDA #0
-        LDX #6
-        LDY #3
-        JSR NMPRNT
-        JSR FRESH
-        LDA #"&"
+        JSR CVTDEC      ; convert to BCD using hardware mode
+        LDA #0          ; clear digit counter
+        LDX #6          ; max digits + 1
+        LDY #3          ; bits per digit - 1
+        JSR NMPRNT      ; print result without leading zeros
+        JSR FRESH       ; next line and clear
+        LDA #"&"        ; print & sigil for octal
         JSR CHROUT
-        LDA #0
-        LDX #8
-        LDY #2
-        JSR PRINUM
-        JSR FRESH
-        LDA #"%"
+        LDA #0          ; clear digit counter
+        LDX #8          ; max digits + 1
+        LDY #2          ; bits per digit - 1
+        JSR PRINUM      ; output number
+        JSR FRESH       ; next line and clear
+        LDA #"%"        ; print % sigil for binary
         JSR CHROUT
-        LDA #0
-        LDX #$18
-        LDY #0
-        JSR PRINUM
-        JMP STRT
+        LDA #0          ; clear digit counter
+        LDX #$18        ; max digits + 1
+        LDY #0          ; bits per digit - 1
+        JSR PRINUM      ; output number
+        JMP STRT        ; back to mainloop
 
 ; -----------------------------------------------------------------------------
-CVTDEC  JSR COPY12
-        LDA #0
-        LDX #2
+; convert binary to BCD
+
+CVTDEC  JSR COPY12      ; copy value from TMP0 to TMP2
+        LDA #0          ; clear accumulator
+        LDX #2          ; clear 3 bytes in work buffer
 DECML1  STA U0AA0,X
         DEX
         BPL DECML1
-        ; CONVERT TO DECIMAL
-        LDY #16
-        PHP
-        SEI
-        SED
-DECML2  ASL TMP2
-        ROL TMP2+1
-        LDX #2
-DECDBL  LDA U0AA0,X
-        ADC U0AA0,X
-        STA U0AA0,X
-        DEX
-        BPL DECDBL
-        DEY
-        BNE DECML2
-        PLP
+        LDY #16         ; 16 bits in input
+        PHP             ; save status register
+        SEI             ; disable interrupts
+        SED             ; enable BCD
+DECML2  ASL TMP2        ; rotate bytes out of input low byte
+        ROL TMP2+1      ; .. into high byte and carry bit
+        LDX #2          ; process 3 bytes
+DECDBL  LDA U0AA0,X     ; load current value of byte
+        ADC U0AA0,X     ; add it to itself plus the carry bit
+        STA U0AA0,X     ; store it back in the same location
+        DEX             ; decrement byte counter
+        BPL DECDBL      ; loop until all bytes processed
+        DEY             ; decrement bit counter
+        BNE DECML2      ; loop until all bits processed
+        PLP             ; restore processor status
         RTS
 
-; -----------------------------------------------------------------------------
-PRINUM  PHA 
-        LDA TMP0
+; load the input value and fall through to print it
+PRINUM  PHA             ; save accumulator
+        LDA TMP0        ; copy input low byte to work buffer
         STA U0AA0+2
-        LDA TMP0+1
+        LDA TMP0+1      ; copy input high byte to work buffer
         STA U0AA0+1
-        LDA #0
+        LDA #0          ; clear overflow byte in work buffer
         STA U0AA0
-        PLA
+        PLA             ; restore accumulator
 
-; -----------------------------------------------------------------------------
-; PRINT WITH ZERO SUPPR
-NMPRNT  STA DIGCNT
-        STY NUMBIT
-DIGOUT  LDY NUMBIT
-        LDA #0
-ROLBIT  ASL U0AA0+2
-        ROL U0AA0+1
-        ROL U0AA0
-        ROL A
-        DEY
-        BPL ROLBIT
-        TAY
-        BNE NZERO
-        CPX #1
-        BEQ NZERO
-        LDY DIGCNT
-        BEQ ZERSUP
-NZERO   INC DIGCNT
-        ORA #$30
-        JSR CHROUT
-ZERSUP  DEX 
-        BNE DIGOUT
+; print number in specified base without leading zeros
+NMPRNT  STA DIGCNT      ; number of digits in accumulator
+        STY NUMBIT      ; bits per digit passed in Y register
+DIGOUT  LDY NUMBIT      ; get bits to process
+        LDA #0          ; clear accumulator
+ROLBIT  ASL U0AA0+2     ; shift bits out of low byte
+        ROL U0AA0+1     ; ... into high byte
+        ROL U0AA0       ; ... into overflow byte
+        ROL A           ; ... into accumulator
+        DEY             ; decrement bit counter
+        BPL ROLBIT      ; loop until all bits processed
+        TAY             ; check whether accumulator is 0
+        BNE NZERO       ; if not, print it
+        CPX #1          ; have we output the max number of digits?
+        BEQ NZERO       ; if not, print it
+        LDY DIGCNT      ; how many digits have we output?
+        BEQ ZERSUP      ; skip output if digit is 0
+NZERO   INC DIGCNT      ; increment digit counter
+        ORA #$30        ; add numeric value to ascii '0' to get ascii char
+        JSR CHROUT      ; output character
+ZERSUP  DEX             ; decrement number of leading zeros
+        BNE DIGOUT      ; next digit
         RTS
 
 ; -----------------------------------------------------------------------------
