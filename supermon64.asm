@@ -558,8 +558,8 @@ ASQEEZ  DEX                 ; move to previous char
         SBC #$3F            ; subtract $3F from ascii code so A-Z = 2 to 27
         LDY #$05            ; letters now fit in 5 bits; shift them out
 ASHIFT  LSR A               ;   into the first two bytes of the inst buffer
-        ROR U0AA0+1         ; catch the low bit from accumulator in U0AA0[1]
-        ROR U0AA0           ; catch the low bit from high byte in U0AA0[0]
+        ROR U0AA0+1         ; catch the low bit from accumulator in right byte
+        ROR U0AA0           ; catch the low bit from right byte in left byte
         DEY                 ; count down bits
         BNE ASHIFT          ; keep looping until we reach zero
         BEQ ASQEEZ          ; unconditional branch to handle next char
@@ -671,13 +671,13 @@ ABRANX  DEX                 ; adjust branch target relative to the
         DEX                 ;   instruction following this one
         TXA
         LDY LENGTH          ; load length of operand
-        BNE OBJP2
+        BNE OBJP2           ; don't use the absolute address
 
 ; assemble machine code
-OBJPUT  LDA TMP0-1,Y        ; put bytes from operand into instruction
-OBJP2   STA (TMP2),Y
+OBJPUT  LDA TMP0-1,Y        ; get the operand
+OBJP2   STA (TMP2),Y        ; store it after the opcode
         DEY
-        BNE OBJPUT
+        BNE OBJPUT          ; copy the other byte of operand if there is one
 A1BYTE  LDA OPCODE          ; put opcode into instruction
         STA (TMP2),Y
         JSR CRLF            ; carriage return
@@ -702,10 +702,10 @@ A1BYTE  LDA OPCODE          ; put opcode into instruction
         JSR ASCTWO
         STA KEYD+4          ; put it in the keyboard buffer
         STX KEYD+5
-        LDA #7
+        LDA #7              ; set number of chars in keyboard buffer
         STA NDX
-        JMP STRT
-SERROR  JMP ERROR
+        JMP STRT            ; back to main loop
+SERROR  JMP ERROR           ; handle error
 
 ; check characters in operand
 CHEK2B  JSR CHEKOP          ; check two bytes against value in accumulator
@@ -724,95 +724,95 @@ OPOK    INC U9F             ; opcode matches so far; check the next criteria
 
 ; -----------------------------------------------------------------------------
 ; disassemble [D]
-DISASS  BCS DIS0AD
-        JSR COPY12
-        JSR GETPAR
-        BCC DIS2AD
-DIS0AD  LDA #$14
-        STA TMP0
-        BNE DISGO
-DIS2AD  JSR SUB12
-        BCC DERROR
-DISGO   JSR CLINE
-        JSR STOP
-        BEQ DISEXIT
-        JSR DSOUT1
+DISASS  BCS DIS0AD          ; if no address was given, start from last address
+        JSR COPY12          ; copy start address to TMP2
+        JSR GETPAR          ; get end address in TMP0
+        BCC DIS2AD          ; if one was given, skip default
+DIS0AD  LDA #$14            ; disassemble 14 bytes by default
+        STA TMP0            ; store length in TMP0
+        BNE DISGO           ; skip length calculation
+DIS2AD  JSR SUB12           ; calculate number of bytes between start and end
+        BCC DERROR          ; error if end address is before start address
+DISGO   JSR CLINE           ; clear the current line
+        JSR STOP            ; check for stop key
+        BEQ DISEXIT         ; exit early if pressed
+        JSR DSOUT1          ; output disassembly prefix ". "
         INC LENGTH
-        LDA LENGTH
+        LDA LENGTH          ; add length of last instruction to start address
         JSR BUMPAD2
-        LDA LENGTH
+        LDA LENGTH          ; subtract length of last inst from end address
         JSR SUBA2
         BCS DISGO
-DISEXIT JMP STRT
+DISEXIT JMP STRT            ; back to mainloop
 DERROR  JMP ERROR
 
-DSOUT1  LDA #"."
+DSOUT1  LDA #"."            ; output ". " prefix to allow edit and reassemble
         JSR CHROUT
         JSR SPACE
 
-DISLIN  JSR SHOWAD
-        JSR SPACE
-        LDY #0
-        LDA (TMP2),Y
-        JSR INSTXX
-        PHA
-        LDX LENGTH
-        INX
-DSBYT   DEX 
-        BPL DSHEX
-        STY SAVY
-        LDY #MSG8-MSGBAS
+DISLIN  JSR SHOWAD          ; show the address of the instruction
+        JSR SPACE           ; insert a space
+        LDY #0              ; no offset
+        LDA (TMP2),Y        ; load operand of current instruction
+        JSR INSTXX          ; get mnemonic and addressing mode for opcode
+        PHA                 ; save index into mnemonic table
+        LDX LENGTH          ; get length of operand
+        INX                 ; add 1 byte for opcode
+DSBYT   DEX                 ; decrement index
+        BPL DSHEX           ; show hex for byte being disassembled
+        STY SAVY            ; save index
+        LDY #MSG8-MSGBAS    ; skip 3 spaces
         JSR SNDMSG
-        LDY SAVY
+        LDY SAVY            ; restore index
         JMP NXBYT
-DSHEX   LDA (TMP2),Y
+DSHEX   LDA (TMP2),Y        ; show hex for byte
         JSR WRBYTE
 
-NXBYT   INY 
-        CPY #3
-        BCC DSBYT
-        PLA
-        LDX #3
-        JSR PROPXX
-        LDX #6
-PRADR1  CPX #3
-        BNE PRADR3
-        LDY LENGTH
-        BEQ PRADR3
-PRADR2  LDA ACMD
-        CMP #$E8
-        PHP
-        LDA (TMP2),Y
-        PLP
-        BCS RELAD
-        JSR WRTWO
+NXBYT   INY                 ; next byte
+        CPY #3              ; have we output 3 bytes yet?
+        BCC DSBYT           ; if not, loop
+        PLA                 ; restore index into mnemonic table
+        LDX #3              ; 3 letters in mnemonic
+        JSR PROPXX          ; print mnemonic
+        LDX #6              ; 6 possible address mode character combos
+PRADR1  CPX #3              ; have we checked the third combo yet?
+        BNE PRADR3          ; if so, output the leading characters
+        LDY LENGTH          ; get the length of the operand
+        BEQ PRADR3          ; if it's zero, there's no operand to print
+PRADR2  LDA ACMD            ; otherwise, get the addressing mode
+        CMP #$E8            ; check for relative addressing
+        PHP                 ; save result of check
+        LDA (TMP2),Y        ; get the operand
+        PLP                 ; restore result of check
+        BCS RELAD           ; handle a relative address
+        JSR WRTWO           ; output digits from address
         DEY
-        BNE PRADR2
-PRADR3  ASL ACMD
-        BCC PRADR4
-        LDA CHAR1-1,X
-        JSR CHROUT
-        LDA CHAR2-1,X
-        BEQ PRADR4
-        JSR CHROUT
-PRADR4  DEX 
-        BNE PRADR1
-        RTS
-RELAD   JSR UB64D
+        BNE PRADR2          ; repeat for next byte of operand, if there is one
+PRADR3  ASL ACMD            ; check whether addr mode uses the current char
+        BCC PRADR4          ; if not, skip it
+        LDA CHAR1-1,X       ; look up the first char in the table
+        JSR CHROUT          ; print first char
+        LDA CHAR2-1,X       ; look up the second char in the table
+        BEQ PRADR4          ; if there's no second character, skip it
+        JSR CHROUT          ; print second char
+PRADR4  DEX                 ; next potential address mode character
+        BNE PRADR1          ; loop if we haven't checked them all yet
+        RTS                 ; back to caller
+RELAD   JSR UB64D           ; calculate absolute address from relative
         CLC
-        ADC #1
-        BNE RELEND
-        INX
-RELEND  JMP WRADDR
+        ADC #1              ; adjust address relative to next instruction
+        BNE RELEND          ; don't increment high byte unless we overflowed
+        INX                 ; increment high byte
+RELEND  JMP WRADDR          ; print address
 
-UB64D   LDX TMP2+1
-        TAY
-        BPL RELC2
-        DEX
-RELC2   ADC TMP2
-        BCC RELC3
-        INX
-RELC3   RTS 
+UB64D   LDX TMP2+1          ; get high byte of current address
+        TAY                 ; is relative address positive or negative?
+        BPL RELC2           ; if positive, leave high byte alone
+        DEX                 ; if negative, decrement high byte
+RELC2   ADC TMP2            ; add relative address to low byte
+        BCC RELC3           ; if there's no carry, we're done
+        INX                 ; if there's a carry, increment the high byte
+RELC3   RTS
 
 ; -----------------------------------------------------------------------------
 ; get opcode mode and length
