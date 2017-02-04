@@ -97,15 +97,13 @@ STOP    = $FFE1             ; check the STOP key
 GETIN   = $FFE4             ; get a character
 
 ; -----------------------------------------------------------------------------
-; basic header
-.IF 1
-        *= $0801
-        .WORD (+), 2005     ; pointer, line number
-        .NULL $9E, ^SUPER   ; sys to entry point
-+       .WORD 0             ; basic line end
-.ENDIF
+; set up origin
 
-        *= $9519
+        .WEAK
+ORG     = $9519
+        .ENDWEAK
+
+*       = ORG
 
 ; -----------------------------------------------------------------------------
 ; initial entry point
