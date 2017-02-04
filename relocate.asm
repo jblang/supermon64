@@ -1,22 +1,5 @@
 
 ; Relocatable code stub for Supermon 64 by Jim Butterfield
-
-; Jim Butterfield described the post-processing of Supermon 64 binaries
-; in a posting to comp.sys.cbm on Dec 20, 2003:
-
-; I should note that, since Supermon+64 is relocatable code, the source
-; does not assemble into the final binary file.  It may seem crude, but
-; I follow this procedure:  (1) The source is carefully structured so
-; that there are no "dispersed addresses" such as might be created with
-; something like LDA #>VECTOR .. LDY #<VECTOR - every relocatable
-; address is two adjacent bytes;  (2) I assemble the source TWICE, to
-; two different page addresses; the only difference in the binaries will
-; be the high-order bytes of the relocatable addresses; (3) a small
-; post-processing program blends the two binaries into a relocatable
-; package, adding a Basic driver to complete the bundle.
-
-; Source: https://groups.google.com/forum/#!searchin/comp.sys.cbm/supermon$2064%7Csort:relevance/comp.sys.cbm/5owItyf5qjk/50_UQlwVnPcJ
-
 ; This code was disassembled from the original Supermon+64 V1.2 binary.
 
 ; The relocation stub starts at the Start of Variables pointer (VARTAB) and
@@ -29,9 +12,8 @@
 ; adding the top of memory to them will yield the absolute address of the
 ; jump target in the relocated code.
 
-; The next step will be to build a Python script that will take Supermon64
-; binaries assembled to two different addresses and output relocatable code
-; with the relative addresses and $36 address markers.
+; build.py will build a relocatable Supermon64 binary from this stub plus
+; standard Supermon64 binaries assembled to two different pages.
 
 ; ----------------------------------------------------------------------------
 ; variables

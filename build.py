@@ -40,23 +40,26 @@ if len(mon1) != len(mon2):
     print("input files are not the same length")
     sys.exit()
 
-if len(mon1) > 38911:
-    print("input files too large")
-    sys.exit()
+# get end of first program from header
+end1 = struct.unpack('H', mon1[0:2])[0] + len(mon1) - 2
 
-origin = struct.unpack('H', mon1[0:2])[0]
+# strip origin from both programs
 mon1 = mon1[2:]
 mon2 = mon2[2:]
 
 with open(sys.argv[4], 'wb') as out:
+    # prepend relocator stub
     out.write(stub)
+    # separate from supermon code with $36 twice
     out.write(b'\x36\x36')
     i = 0
     while i < len(mon1):
         if len(mon1) > i+1 and mon1[i+1] != mon2[i+1]:
             addr = struct.unpack('H', mon1[i:i+2])[0]
-            offset = struct.pack('h', addr - origin - len(mon1))
+            # calculate offset to address
+            offset = struct.pack('h', addr - end1)
             out.write(offset)
+            # mark address to be adjusted with $36
             out.write(b'\x36')
             i += 2
         else:
