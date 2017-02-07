@@ -3,15 +3,22 @@ By Jim Butterfield
 
 ## Overview
 Supermon64 is a machine-language monitor for the Commodore 64 written by
-[Jim Butterfield](https://en.wikipedia.org/wiki/Jim_Butterfield). It
-originally appeared as a type-in program in the 
+[Jim Butterfield](https://en.wikipedia.org/wiki/Jim_Butterfield).
+The first version for the Commodore 64 originally appeared as a type-in program in the 
 [January 1983 issue of Compute Magazine](https://archive.org/details/1983-01-compute-magazine). 
-An earlier version was widely distributed by Commodore User's Groups and included on the 
-[demo diskettes](http://www.zimmers.net/anonftp/pub/cbm/demodisks/c64/starter-kit.d64.gz)
-and tapes that Commodore provided with their hardware.  An improved version followed in 1985,
-updated to include the features in the built-in monitors for the Commodore Plus/4 and 128.
-This is the version that is preserved here.
+It was based on an earlier version of Supermon for the PET and VIC-20. An improved version
+followed in 1985, updated to include the features in the built-in monitors for the
+Commodore Plus/4 and 128.  This is the version that is preserved here.
 
+Supermon 64 was widely distributed by Commodore User's Groups and included on the 
+[demo diskettes](http://www.zimmers.net/anonftp/pub/cbm/demodisks/c64/starter-kit.d64.gz)
+and tapes that Commodore provided with their hardware.  It was also included as a type-in
+program in the back of many books on machine language programming, including Rae West's
+[Programming the Commodore 64: The definitive Guide](https://archive.org/download/Compute_s_Programming_the_Commodore_64_The_Definitive_Guide/Compute_s_Programming_the_Commodore_64_The_Definitive_Guide.pdf)
+and Jim Butterfield's own 
+[Machine Language for the Commodore 64](https://archive.org/details/Machine_Language_for_the_Commodore_Revised_and_Expanded_Edition).
+
+Here is a youtube video containing a quick demo: https://www.youtube.com/watch?v=MEjnMt_3wkU
 
 ## Contents
 
@@ -21,6 +28,8 @@ Original artifacts:
   sources, instructions and binaries.
 - [sprmon64.d64](sprmon64.d64) is a D64 image created from the self-dissolving
   archive for use with VICE, disk drive emulators, or to create a real floppy disk.
+- [supermon64.prg](supermon64.prg) is the original Supermon+64 binary taken from
+  the archive. The sources below will build an identical binary.
 
 Modernized sources:
 - [supermon64.asm](supermon64.asm) is the modernized Supermon+64 V1.2 source code with my comments. 
@@ -329,19 +338,17 @@ accidentally disconnected by use of the run-stop/restore keys.
 
 ## Background
 
-After working my way through Jim Butterfield's excellent 
-[Machine Language for the Commodore 64](https://archive.org/details/Machine_Language_for_the_Commodore_Revised_and_Expanded_Edition)
-using his equally excellent monitor, I wanted to find some real assembly code to study,
-and the software I had just been using seemed like a natural place to start.  I started looking
-for the sources online but for a piece of public domain software, it wasn't as easy as to find
-as you'd think.  
+After working my way through Jim Butterfield's excellent book using his equally excellent monitor,
+I wanted to find some real assembly code to study, and the software I had just been using seemed
+like a natural place to start.  I started looking for the sources online but for a piece of
+public domain software, it wasn't as easy as to find as you'd think.  
 
 I found [this thread](http://comp.sys.cbm.narkive.com/KUAL6oqM/attn-jim-butterfiled-i-m-looking-for-supermon-64-source-code)
 on comp.sys.cbm where someone asked for the sources and Jim Butterfield himself responded but
 didn't have easy access to the sources. One person pointed to this
-[modified version](http://www.ffd2.com/fridge/programs/supermon.s) but I wanted the original.
-Someone else mentioned a file called SPRMON64.SDA at a now-defunct FTP
-site.  I searched for the filename and found what is apparently the last remaining copy on the internet
+[modified version](http://www.ffd2.com/fridge/programs/supermon.s)
+but I wanted the original.  Someone else mentioned a file called SPRMON64.SDA at a now-defunct FTP
+site.  I googled for the filename and found what is apparently the last remaining copy on the internet
 on a [gopher proxy](https://gopherproxy.meulie.net/sdf.org/1/users/rogertwo/prgs/cbm/c64/programming/).
 
 I downloaded it and found that it contains what appear to be the original source and binaries
@@ -357,20 +364,21 @@ it as I went along.
 
 As Jim noted in his usenet posting, the provided sources don't produce the final Supermon 64 binary:
 
-    I should note that, since Supermon+64 is relocatable code, the source
-    does not assemble into the final binary file.  It may seem crude, but
-    I follow this procedure:  (1) The source is carefully structured so
-    that there are no "dispersed addresses" such as might be created with
-    something like LDA #>VECTOR .. LDY #<VECTOR - every relocatable
-    address is two adjacent bytes;  (2) I assemble the source TWICE, to
-    two different page addresses; the only difference in the binaries will
-    be the high-order bytes of the relocatable addresses; (3) a small
-    post-processing program blends the two binaries into a relocatable
-    package, adding a Basic driver to complete the bundle.
+>I should note that, since Supermon+64 is relocatable code, the source
+does not assemble into the final binary file.  It may seem crude, but
+I follow this procedure:  (1) The source is carefully structured so
+that there are no "dispersed addresses" such as might be created with
+something like LDA #>VECTOR .. LDY #<VECTOR - every relocatable
+address is two adjacent bytes;  (2) I assemble the source TWICE, to
+two different page addresses; the only difference in the binaries will
+be the high-order bytes of the relocatable addresses; (3) a small
+post-processing program blends the two binaries into a relocatable
+package, adding a Basic driver to complete the bundle.
 
-The sources for the relocator were not included in the self-dissolving archive, so I disassembled
-the original supermon64.prg binary and reconstructed them from that. I also wrote a python script
-that builds a relocatable binary according to Jim's instructions above.  I have confirmed that the
+Neither the sources for the relocator nor the post-processing program Jim refers to were included
+in the self-dissolving archive, so I disassembled the original supermon64.prg binary and 
+reconstructed the relocator stub from that. I also wrote a simple python script that builds a
+relocatable binary according to Jim's instructions above.  I have confirmed that the
 binary produced by assembling `supermon64.asm` and `relocator.asm` and then combining them using
 `build.py` is identical to the original binary `supermon64.prg` provided in the archive.
 
