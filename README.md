@@ -14,11 +14,11 @@ Supermon 64 was widely distributed by Commodore User's Groups and included on th
 [demo diskettes](http://www.zimmers.net/anonftp/pub/cbm/demodisks/c64/starter-kit.d64.gz)
 and tapes that Commodore provided with their hardware.  It was also included as a type-in
 program in the back of many books on machine language programming, including Rae West's
-[Programming the Commodore 64: The definitive Guide](https://archive.org/download/Compute_s_Programming_the_Commodore_64_The_Definitive_Guide/Compute_s_Programming_the_Commodore_64_The_Definitive_Guide.pdf)
+[Programming the Commodore 64: The Definitive Guide](https://archive.org/download/Compute_s_Programming_the_Commodore_64_The_Definitive_Guide/Compute_s_Programming_the_Commodore_64_The_Definitive_Guide.pdf)
 and Jim Butterfield's own 
 [Machine Language for the Commodore 64](https://archive.org/details/Machine_Language_for_the_Commodore_Revised_and_Expanded_Edition).
 
-Here is a youtube video containing a quick demo: https://www.youtube.com/watch?v=MEjnMt_3wkU
+Here is a video with a quick demo: https://www.youtube.com/watch?v=MEjnMt_3wkU
 
 ## Contents
 
