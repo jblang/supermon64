@@ -10,21 +10,22 @@ Here is a 10-minute video I made demonstrating many of its features: https://www
 ## Contents
 
 Original artifacts:
-- [sprmon64.txt](sprmon64.txt) is the original posting to comp.binaries.cbm
+- [sprmon64.txt](sprmon64.txt) is a posting to comp.binaries.cbm
   containing a uuencoded self-dissolving archive with the Supermon+64 V1.2
   sources, instructions and binaries.
-- [sprmon64.d64](sprmon64.d64) is a D64 image created from the self-dissolving
+- [sprmon64.d64](sprmon64.d64) is a D64 image created from the 
   archive for use with VICE, disk drive emulators, or to create a real floppy disk.
 - [supermon64.prg](supermon64.prg) is the original Supermon+64 binary taken from
   the archive. The sources below will build an identical binary.
 
 Modernized sources:
-- [supermon64.asm](supermon64.asm) is the modernized Supermon+64 V1.2 source code with my comments. 
+- [supermon64.asm](supermon64.asm) is the Supermon+64 V1.2 source code, converted to 64tass format
+ and heavily commented by me. 
 - [relocate.asm](relocate.asm) is the disassembled machine-code stub that loads Supermon+64 into
   the top of BASIC memory.
-- [build.py](build.py) is a python script that transforms the assembled relocator
-  stub and the Supermon+64 binaries into a relocatable binary.
-- [Makefile](Makefile) is a GNU makefile that will build the supermon64.prg binary
+- [build.py](build.py) is a python script I wrote that transforms the assembled relocator
+  stub and the fixed-location Supermon binaries into a relocatable binary.
+- [Makefile](Makefile) is a GNU makefile that will build the final supermon64.prg binary
   using the above sources.
 
 ## Background
@@ -64,22 +65,21 @@ looking for the sources online but for a piece of public domain software, it was
 to find as you'd think.  
 
 I found [this thread](http://comp.sys.cbm.narkive.com/KUAL6oqM/attn-jim-butterfiled-i-m-looking-for-supermon-64-source-code)
-on comp.sys.cbm where someone asked for the sources and Jim Butterfield himself responded but
-didn't have easy access to the sources. One person pointed to this
+on comp.sys.cbm where someone asked for the sources and Jim Butterfield himself responded, but
+at the time he didn't have easy access to the sources. One person pointed to this
 [modified version](http://www.ffd2.com/fridge/programs/supermon.s)
 but I wanted the original.  Someone else mentioned a file called SPRMON64.SDA at a now-defunct FTP
-site.  I googled for the filename and found what is apparently the last remaining copy on the internet
+site.  I googled for the filename and found what was apparently the last remaining copy on the internet
 on a [gopher proxy](https://gopherproxy.meulie.net/sdf.org/1/users/rogertwo/prgs/cbm/c64/programming/).
 
 I downloaded it and found that it contains what appear to be the original source and binaries
 for the updated 1.2 version.  Since it doesn't seem to have an official home and it's 
 continued availability on the internet seemed precarious, I decided to give it one on GitHub.
 
-I have modernized the source code so it can be built using the
-[64tass](https://sourceforge.net/projects/tass64/) cross-assembler. The original source 
-(included on the D64 image) was almost completely uncommented and used a few outdated constructs
-that were unsupported by 64tass.  I converted these to the equivalent modern constructs, indented the
-code, and then worked my way through the code line-by-line until I understood it all, commenting
+I modernized the source code so it can be built using the [64tass](https://sourceforge.net/projects/tass64/)
+cross-assembler. The original source (included on the D64 image) was almost completely uncommented and used a
+few constructs that were unsupported by 64tass.  I converted these to the equivalent 64tass constructs, 
+indented the code, and then worked my way through the code line-by-line until I understood it all, commenting
 it as I went along.
 
 As Jim noted in his usenet posting, the provided sources don't produce the final Supermon 64 binary:
@@ -102,8 +102,8 @@ relocatable binary according to Jim's instructions above.  I have confirmed that
 binary produced by assembling `supermon64.asm` and `relocator.asm` and then combining them using
 `build.py` is identical to the original binary `supermon64.prg` provided in the archive.
 
-I also converted the usage instructions from a PETSCII file I found in the archive to the Markdown
-you see below.  Lastly, I researched and documented the history of the code that you are reading now.
+I  converted the usage instructions from a PETSCII file in the archive to the Markdown
+below.  Lastly, I researched and documented the history of the code that you are reading now.
 
 ## Usage Instructions
 
