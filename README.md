@@ -56,7 +56,8 @@ program in the back of many books on machine language programming, including Rae
 and Jim Butterfield's own 
 [Machine Language for the Commodore 64](https://archive.org/details/Machine_Language_for_the_Commodore_Revised_and_Expanded_Edition).
 
-After working my way through Jim Butterfield's excellent book using Supermon64,
+More than 30 years later, here's where I come in.  I recently decided to teach myself 6502
+assembly. After working my way through Jim Butterfield's excellent book using Supermon64,
 I wanted to find some real assembly code to study, and the software I had just been using seemed
 like a natural place to start.  I started looking for the sources online but for a piece of
 public domain software, it wasn't as easy as to find as you'd think.  
@@ -94,11 +95,14 @@ post-processing program blends the two binaries into a relocatable
 package, adding a Basic driver to complete the bundle.
 
 Neither the sources for the relocator nor the post-processing program Jim refers to were included
-in the self-dissolving archive, so I disassembled the original supermon64.prg binary and 
+in the archive, so I disassembled the original supermon64.prg binary and 
 reconstructed the relocator stub from that. I also wrote a simple python script that builds a
 relocatable binary according to Jim's instructions above.  I have confirmed that the
 binary produced by assembling `supermon64.asm` and `relocator.asm` and then combining them using
 `build.py` is identical to the original binary `supermon64.prg` provided in the archive.
+
+I also converted the usage instructions from a PETSCII file I found in the archive to the Markdown
+you see below.  Lastly, I researched and documented the history of the code that you are reading now.
 
 ## Usage Instructions
 
