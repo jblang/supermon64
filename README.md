@@ -1,10 +1,11 @@
 # Supermon+64 V1.2
 By Jim Butterfield et. al.
 
-Supermon64 is a machine-language monitor for the Commodore 64. It allows you to 
-inspect and alter memory locations as well as assemble and disassemble machine code.
+Supermon64 is a machine-language monitor for the Commodore 64.  In modern parlance, it would be
+called a debugger, providing functions including inspecting and altering registers and memory locations;
+searching, comparing, and transferring blocks of memory; and assembling and disassembling machine code.
 
-Here is a 10-minute video demonstrating many of its features: https://www.youtube.com/watch?v=MEjnMt_3wkU
+Here is a 10-minute video I made demonstrating many of its features: https://www.youtube.com/watch?v=MEjnMt_3wkU
 
 ## Contents
 
@@ -40,8 +41,8 @@ contained the following credits:
 The earliest documented appearance of Supermon that I could find was in the 
 [January 1980 issue of The Transactor](https://archive.org/details/transactor-magazines-v2-i08). 
 From its origins on the PET, Supermon made its way to the VIC and the Commodore 64. It apparently
-shares its DNA with the monitor and mini assembler programs on the Apple II, as well as Micromon 
-on various Commodore computers.
+shares some DNA with the monitor and mini assembler on the Apple II as well as Micromon 
+and MADS monitors on various Commodore computers.
 
 The first version for the Commodore 64 appeared as a type-in program in the 
 [January 1983 issue of Compute Magazine](https://archive.org/details/1983-01-compute-magazine). 
@@ -56,11 +57,11 @@ program in the back of many books on machine language programming, including Rae
 and Jim Butterfield's own 
 [Machine Language for the Commodore 64](https://archive.org/details/Machine_Language_for_the_Commodore_Revised_and_Expanded_Edition).
 
-More than 30 years later, here's where I come in.  I recently decided to teach myself 6502
-assembly. After working my way through Jim Butterfield's excellent book using Supermon64,
-I wanted to find some real assembly code to study, and the software I had just been using seemed
-like a natural place to start.  I started looking for the sources online but for a piece of
-public domain software, it wasn't as easy as to find as you'd think.  
+More than 30 years later, I decided to learn 6502 assembly. After working my way through 
+Jim Butterfield's excellent book using Supermon64, I wanted to find some real assembly code to 
+study, and the software I had just been using seemed like a natural place to start.  I started 
+looking for the sources online but for a piece of public domain software, it wasn't as easy as
+to find as you'd think.  
 
 I found [this thread](http://comp.sys.cbm.narkive.com/KUAL6oqM/attn-jim-butterfiled-i-m-looking-for-supermon-64-source-code)
 on comp.sys.cbm where someone asked for the sources and Jim Butterfield himself responded but
