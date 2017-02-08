@@ -104,6 +104,7 @@ binary produced by assembling `supermon64.asm` and `relocator.asm` and then comb
 
 I  converted the usage instructions from a PETSCII file in the archive to the Markdown
 below.  Lastly, I researched and documented the history of the code that you are reading now.
+I hope you enjoy this piece of computing history!
 
 ## Usage Instructions
 
