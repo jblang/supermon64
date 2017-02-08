@@ -37,11 +37,11 @@ contained the following credits:
 - Most other stuff (,HAFT) by Bill Seiler
 - Tidied & Wrapped by Jim Butterfield
 
-The PET version's earliest documented appearance was in the 
-[December 1981 issue of Compute Magazine](https://archive.org/details/1981-12-compute-magazine).
-From there, it made its way to the VIC and the Commodore 64. It apparently shares its DNA with
-the monitor and mini assembler programs on the Apple II, as well as Micromon on various Commodore
-computers.
+The earliest documented appearance of Supermon that I could find was in the 
+[January 1980 issue of The Transactor](https://archive.org/details/transactor-magazines-v2-i08). 
+From its origins on the PET, Supermon made its way to the VIC and the Commodore 64. It apparently
+shares its DNA with the monitor and mini assembler programs on the Apple II, as well as Micromon 
+on various Commodorecomputers.
 
 The first version for the Commodore 64 appeared as a type-in program in the 
 [January 1983 issue of Compute Magazine](https://archive.org/details/1983-01-compute-magazine). 
