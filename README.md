@@ -32,12 +32,12 @@ Supermon is closely associated with [Jim Butterfield](https://en.wikipedia.org/w
 but it had many contributors over the years.  The original version of Supermon for the Commodore PET
 contained the following credits:
 
->Dissassembler by Wozniak/Baum
-Single step by Jim Russo
-Most other stuff (,HAFT) By Bill Seiler
-Tidied & Wrapped by Jim Butterfield
+- Dissassembler by Wozniak/Baum
+- Single step by Jim Russo
+- Most other stuff (,HAFT) by Bill Seiler
+- Tidied & Wrapped by Jim Butterfield
 
-The version for the PET appeared in the 
+The PET version's earliest documented appearance was in the 
 [December 1981 issue of Compute Magazine](https://archive.org/details/1981-12-compute-magazine).
 From there, it made its way to the VIC and the Commodore 64. It apparently shares its DNA with
 the monitor and mini assembler programs on the Apple II, as well as Micromon on various Commodore
