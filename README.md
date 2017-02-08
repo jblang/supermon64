@@ -1,24 +1,10 @@
 # Supermon+64 V1.2
-By Jim Butterfield
+By Jim Butterfield et. al.
 
-## Overview
-Supermon64 is a machine-language monitor for the Commodore 64 written by
-[Jim Butterfield](https://en.wikipedia.org/wiki/Jim_Butterfield).
-The first version for the Commodore 64 originally appeared as a type-in program in the 
-[January 1983 issue of Compute Magazine](https://archive.org/details/1983-01-compute-magazine). 
-It was based on an earlier version of Supermon for the PET and VIC-20. An improved version
-followed in 1985, updated to include the features in the built-in monitors for the
-Commodore Plus/4 and 128.  This is the version that is preserved here.
+Supermon64 is a machine-language monitor for the Commodore 64. It allows you to 
+inspect and alter memory locations as well as assemble and disassemble machine code.
 
-Supermon 64 was widely distributed by Commodore User's Groups and included on the 
-[demo diskettes](http://www.zimmers.net/anonftp/pub/cbm/demodisks/c64/starter-kit.d64.gz)
-and tapes that Commodore provided with their hardware.  It was also included as a type-in
-program in the back of many books on machine language programming, including Rae West's
-[Programming the Commodore 64: The Definitive Guide](https://archive.org/download/Compute_s_Programming_the_Commodore_64_The_Definitive_Guide/Compute_s_Programming_the_Commodore_64_The_Definitive_Guide.pdf)
-and Jim Butterfield's own 
-[Machine Language for the Commodore 64](https://archive.org/details/Machine_Language_for_the_Commodore_Revised_and_Expanded_Edition).
-
-Here is a video with a quick demo: https://www.youtube.com/watch?v=MEjnMt_3wkU
+Here is a 10-minute video demonstrating many of its features: https://www.youtube.com/watch?v=MEjnMt_3wkU
 
 ## Contents
 
@@ -42,7 +28,35 @@ Modernized sources:
 
 ## Background
 
-After working my way through Jim Butterfield's excellent book using his equally excellent monitor,
+Supermon is closely associated with [Jim Butterfield](https://en.wikipedia.org/wiki/Jim_Butterfield)
+but it had many contributors over the years.  The original version of Supermon for the Commodore PET
+contained the following credits:
+
+>Dissassembler by Wozniak/Baum
+Single step by Jim Russo
+Most other stuff (,HAFT) By Bill Seiler
+Tidied & Wrapped by Jim Butterfield
+
+The version for the PET appeared in the 
+[December 1981 issue of Compute Magazine](https://archive.org/details/1981-12-compute-magazine).
+From there, it made its way to the VIC and the Commodore 64. It apparently shares its DNA with
+the monitor and mini assembler programs on the Apple II, as well as Micromon on various Commodore
+computers.
+
+The first version for the Commodore 64 appeared as a type-in program in the 
+[January 1983 issue of Compute Magazine](https://archive.org/details/1983-01-compute-magazine). 
+An improved version followed in 1985, updated to include the features in the built-in monitors
+for the Commodore Plus/4 and 128.  This is the version that is preserved here.
+
+Supermon 64 was widely distributed by Commodore User's Groups and included on the 
+[demo diskettes](http://www.zimmers.net/anonftp/pub/cbm/demodisks/c64/starter-kit.d64.gz)
+and tapes that Commodore provided with their hardware.  It was also included as a type-in
+program in the back of many books on machine language programming, including Rae West's
+[Programming the Commodore 64: The Definitive Guide](https://archive.org/download/Compute_s_Programming_the_Commodore_64_The_Definitive_Guide/Compute_s_Programming_the_Commodore_64_The_Definitive_Guide.pdf)
+and Jim Butterfield's own 
+[Machine Language for the Commodore 64](https://archive.org/details/Machine_Language_for_the_Commodore_Revised_and_Expanded_Edition).
+
+After working my way through Jim Butterfield's excellent book using Supermon64,
 I wanted to find some real assembly code to study, and the software I had just been using seemed
 like a natural place to start.  I started looking for the sources online but for a piece of
 public domain software, it wasn't as easy as to find as you'd think.  
